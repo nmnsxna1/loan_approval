@@ -8,7 +8,7 @@ import authRoutes from './routes/auth';
 import applicationRoutes from './routes/applications';
 import uploadRoutes from './routes/upload';
 import { errorHandler } from './middleware/errorHandler';
-import { backendLogger, apiLogger, dbLogger, errorLogger } from './utils/logger';
+import { backendLogger, apiLogger, dbLogger, errorLogger, perfLogger } from './utils/logger';
 
 dotenv.config();
 

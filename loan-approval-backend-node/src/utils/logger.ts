@@ -77,9 +77,13 @@ function maskSensitiveData(message: string): string {
   return masked;
 }
 
-function writeToFile(logType: string, content: string): void {
+function writeToFile(logType: string, content: string, sync: boolean = false): void {
   const filePath = getLogFilePath(logType);
-  fs.appendFile(filePath, content, 'utf-8', () => {});
+  if (sync) {
+    fs.appendFileSync(filePath, content, 'utf-8');
+  } else {
+    fs.appendFile(filePath, content, 'utf-8', () => {});
+  }
 }
 
 function formatLog(
@@ -140,9 +144,10 @@ class Logger {
         console.log(entry);
     }
 
-    writeToFile(this.type, entry);
-    if (logLevel >= LogLevel.ERROR && this.type !== LogType.ERROR) {
-      writeToFile(LogType.ERROR, entry);
+    const isError = logLevel >= LogLevel.ERROR;
+    writeToFile(this.type, entry, isError);
+    if (isError && this.type !== LogType.ERROR) {
+      writeToFile(LogType.ERROR, entry, true);
     }
   }
 
