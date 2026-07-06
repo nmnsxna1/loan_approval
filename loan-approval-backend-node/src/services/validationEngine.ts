@@ -1,3 +1,5 @@
+import { backendLogger } from '../utils/logger';
+
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
@@ -96,5 +98,18 @@ export function validateApplication(data: Record<string, any>): ValidationResult
   if (errors.length === 0 && riskScore >= 70) riskLevel = 'LOW';
   else if (errors.length === 0 && riskScore >= 45) riskLevel = 'MEDIUM';
 
-  return { valid: errors.length === 0, errors, riskScore, riskLevel };
+  const result: ValidationResult = { valid: errors.length === 0, errors, riskScore, riskLevel };
+  if (errors.length > 0) {
+    backendLogger.warn(`Validation failed: ${errors.length} error(s)`, {
+      file: 'src/services/validationEngine.ts',
+      function: 'validateApplication',
+      details: errors.join('; '),
+    });
+  } else {
+    backendLogger.info(`Validation passed, risk: ${riskLevel} (score: ${riskScore})`, {
+      file: 'src/services/validationEngine.ts',
+      function: 'validateApplication',
+    });
+  }
+  return result;
 }

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import api from '../../api/axios';
 import { Upload, Save, Send, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 interface FormData {
   applicantName: string; dob: string; gender: string; pan: string; aadhaar: string;
@@ -29,7 +30,12 @@ export default function NewApplication() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    logger.info('NewApplication page mounted', { file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication' });
+  }, []);
+
+  useEffect(() => {
     if (editId) {
+      logger.info(`Loading existing application: ${editId}`, { file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication' });
       api.get(`/applications/${editId}`).then((r) => {
         const d = r.data;
         setForm({
@@ -46,7 +52,13 @@ export default function NewApplication() {
         });
         setExtractedFields(extracted);
         if (d.pdfPath) setPdfUrl(`http://localhost:8080/uploads/${d.pdfPath.split('\\').pop() || d.pdfPath.split('/').pop()}`);
-      }).catch(() => toast.error('Failed to load application'));
+      }).catch((err) => {
+        errorLogger.error('Failed to load existing application', {
+          file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication',
+          message: err.message, applicationId: editId,
+        });
+        toast.error('Failed to load application');
+      });
     }
   }, [editId]);
 
@@ -87,7 +99,11 @@ export default function NewApplication() {
       });
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Upload failed';
-      console.error('Upload error:', err.response?.status, err.response?.data, err);
+      errorLogger.error('Upload failed', {
+        file: 'src/pages/applicant/NewApplication.tsx', function: 'handleUpload',
+        message: err.message, status: err.response?.status,
+        stack: err.stack,
+      });
       toast.error(msg);
     } finally {
       setUploading(false);
@@ -112,21 +128,31 @@ export default function NewApplication() {
 
   const handleSaveDraft = async () => {
     if (!appId) { toast.error('Upload a PDF first'); return; }
+    logger.info('Saving draft', { file: 'src/pages/applicant/NewApplication.tsx', function: 'handleSaveDraft', applicationId: appId });
     try {
       await api.put(`/applications/${appId}`, form);
       toast.success('Draft saved!');
-    } catch { toast.error('Failed to save'); }
+    } catch {
+      errorLogger.error('Failed to save draft', { file: 'src/pages/applicant/NewApplication.tsx', function: 'handleSaveDraft', applicationId: appId });
+      toast.error('Failed to save');
+    }
   };
 
   const handleSubmit = async () => {
     if (!appId) { toast.error('Upload a PDF first'); return; }
     setSubmitting(true);
+    logger.info('Submitting application', { file: 'src/pages/applicant/NewApplication.tsx', function: 'handleSubmit', applicationId: appId });
     try {
       await api.post(`/applications/${appId}/submit`, form);
       toast.success('Application submitted successfully!');
       navigate('/applicant/applications');
     } catch (err: any) {
-      toast.error(err.response?.data?.validation?.errors?.[0] || err.response?.data?.message || 'Submission failed');
+      const errMsg = err.response?.data?.validation?.errors?.[0] || err.response?.data?.message || 'Submission failed';
+      errorLogger.error('Application submission failed', {
+        file: 'src/pages/applicant/NewApplication.tsx', function: 'handleSubmit',
+        applicationId: appId, message: errMsg,
+      });
+      toast.error(errMsg);
     } finally {
       setSubmitting(false);
     }

@@ -5,13 +5,18 @@ import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
 import type { ApplicantDashboard as DashboardData } from '../../types';
 import { FileText, Send, Clock, Calendar } from 'lucide-react';
+import { logger, apiLogger } from '../../utils/logger';
 
 export default function ApplicantDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/applications/dashboard').then((r) => setData(r.data)).finally(() => setLoading(false));
+    logger.info('ApplicantDashboard mounted', { file: 'src/pages/applicant/Dashboard.tsx', function: 'ApplicantDashboard' });
+    api.get('/applications/dashboard').then((r) => {
+      apiLogger.info('Applicant dashboard data loaded', { file: 'src/pages/applicant/Dashboard.tsx' });
+      setData(r.data);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return (

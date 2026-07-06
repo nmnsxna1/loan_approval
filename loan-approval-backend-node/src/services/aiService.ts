@@ -1,7 +1,7 @@
 import fs from 'fs';
 import pdfParse from 'pdf-parse';
 import { getLlmConfig } from '../config/llm';
-import { info, error as logError } from '../utils/logger';
+import { backendLogger, apiLogger, errorLogger, perfLogger } from '../utils/logger';
 
 function extractTextFromSimplePdf(buffer: Buffer): string {
   const raw = buffer.toString('utf-8');
@@ -65,8 +65,13 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
   const maxRetries = 2;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    info(`Calling LLM (attempt ${attempt}/${maxRetries}) at ${url} model=${config.model || 'default'}`);
+    const maskedUrl = url.replace(/\/\/.*@/, '//***@');
+    apiLogger.info(`Calling LLM (attempt ${attempt}/${maxRetries}) model=${config.model || 'default'}`, {
+      file: 'src/services/aiService.ts',
+      function: 'callLlm',
+    });
 
+    const startTime = Date.now();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 180000);
 
@@ -88,6 +93,12 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
         signal: controller.signal,
       });
 
+      const duration = Date.now() - startTime;
+      perfLogger?.info(`LLM API call took ${duration}ms`, {
+        file: 'src/services/aiService.ts',
+        function: 'callLlm',
+      });
+
       if (!response.ok) {
         const errText = await response.text();
         throw new Error(`LLM API error ${response.status}: ${errText}`);
@@ -97,22 +108,33 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
       const content = data?.choices?.[0]?.message?.content;
 
       if (!content || content.trim().length === 0) {
-        logError(`LLM returned empty content (attempt ${attempt})`, JSON.stringify(data).substring(0, 300));
+        errorLogger.error(`LLM returned empty content (attempt ${attempt})`, {
+          file: 'src/services/aiService.ts',
+          function: 'callLlm',
+          extra: JSON.stringify(data).substring(0, 300),
+        });
         if (attempt < maxRetries) {
-          info('Retrying in 2s...');
+          apiLogger.info('Retrying LLM call in 2s...', { file: 'src/services/aiService.ts', function: 'callLlm' });
           await new Promise(r => setTimeout(r, 2000));
           continue;
         }
         throw new Error('LLM returned empty content after retries');
       }
 
-      info(`LLM responded (${content.length} chars)`);
+      apiLogger.info(`LLM responded (${content.length} chars)`, {
+        file: 'src/services/aiService.ts',
+        function: 'callLlm',
+      });
       return content;
     } catch (err: any) {
-      logError(`callLlm attempt ${attempt} failed`, err.message);
-      if (err.stack) logError('callLlm stack', err.stack.substring(0, 500));
+      errorLogger.error(`callLlm attempt ${attempt} failed`, {
+        file: 'src/services/aiService.ts',
+        function: 'callLlm',
+        message: err.message,
+        stack: err.stack?.substring(0, 500),
+      });
       if (attempt < maxRetries) {
-        info('Retrying in 2s...');
+        apiLogger.info('Retrying LLM call in 2s...', { file: 'src/services/aiService.ts', function: 'callLlm' });
         await new Promise(r => setTimeout(r, 2000));
         continue;
       }
@@ -126,22 +148,32 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
 }
 
 export async function extractFromPdf(filePath: string): Promise<{ extracted: ExtractedData; risk: RiskAnalysis }> {
+  const startTime = Date.now();
   try {
-    info('Reading PDF file...');
+    backendLogger.info('Reading PDF file...', { file: 'src/services/aiService.ts', function: 'extractFromPdf' });
     const fileBuffer = fs.readFileSync(filePath);
 
     let pdfText = '';
     try {
       const pdfData = await pdfParse(fileBuffer);
       pdfText = pdfData.text.trim();
-      info(`PDF extracted via pdf-parse: ${pdfText.length} chars`);
+      backendLogger.info(`PDF extracted via pdf-parse: ${pdfText.length} chars`, {
+        file: 'src/services/aiService.ts', function: 'extractFromPdf',
+      });
     } catch (parseErr: any) {
-      logError('pdf-parse failed, trying simple text extractor', parseErr.message);
+      errorLogger.error('pdf-parse failed, trying simple text extractor', {
+        file: 'src/services/aiService.ts', function: 'extractFromPdf',
+        message: parseErr.message,
+      });
       pdfText = extractTextFromSimplePdf(fileBuffer);
       if (pdfText.length > 10) {
-        info(`PDF extracted via simple extractor: ${pdfText.length} chars`);
+        backendLogger.info(`PDF extracted via simple extractor: ${pdfText.length} chars`, {
+          file: 'src/services/aiService.ts', function: 'extractFromPdf',
+        });
       } else {
-        logError('simple extractor also failed, using raw fallback');
+        errorLogger.error('simple extractor also failed, using raw fallback', {
+          file: 'src/services/aiService.ts', function: 'extractFromPdf',
+        });
         pdfText = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r]/g, ' ').substring(0, 3000);
       }
     }
@@ -194,24 +226,27 @@ ${pdfText}`;
 Loan application text:
 ${pdfText}`;
 
-    info('Sending to LLM for extraction...');
+    apiLogger.info('Sending to LLM for extraction...', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
     const extractContent = await callLlm([
       { role: 'system', content: 'You are a precise data extraction tool. Return ONLY valid JSON, no explanations, no markdown, no code fences.' },
       { role: 'user', content: extractionPrompt },
     ]);
-    info('Extraction done, starting risk analysis...');
+    apiLogger.info('Extraction done, starting risk analysis...', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
     const riskContent = await callLlm([
       { role: 'system', content: 'You are a precise data extraction tool. Return ONLY valid JSON, no explanations, no markdown, no code fences.' },
       { role: 'user', content: riskPrompt },
     ]);
 
-    info('LLM responded successfully');
+    apiLogger.info('LLM responded successfully', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
 
     const extractText = extractJsonFromText(extractContent);
     const riskText = extractJsonFromText(riskContent);
-
-    info('Raw extraction response', extractText.substring(0, 200));
-    info('Raw risk response', riskText.substring(0, 200));
 
     let extracted: ExtractedData;
     let risk: RiskAnalysis;
@@ -219,18 +254,30 @@ ${pdfText}`;
       extracted = JSON.parse(extractText);
       risk = JSON.parse(riskText);
     } catch (parseErr: any) {
-      logError('Failed to parse LLM response as JSON', parseErr.message);
-      logError('Extract text', extractText);
-      logError('Risk text', riskText);
+      errorLogger.error('Failed to parse LLM response as JSON', {
+        file: 'src/services/aiService.ts', function: 'extractFromPdf',
+        message: parseErr.message,
+        extra: { extractText: extractText.substring(0, 500), riskText: riskText.substring(0, 500) },
+      });
       throw new Error('Invalid JSON response from LLM: ' + parseErr.message);
     }
 
-    info('AI extraction and risk analysis completed');
+    const totalTime = Date.now() - startTime;
+    perfLogger?.info(`AI extraction completed in ${totalTime}ms`, {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
+    apiLogger.info('AI extraction and risk analysis completed', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
     return { extracted, risk };
   } catch (err: any) {
-    logError('AI processing failed, using fallback data', err.message);
-    if (err.stack) logError('AI stack', err.stack);
-    info('Returning fallback extraction data');
+    errorLogger.error('AI processing failed, using fallback data', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+      message: err.message, stack: err.stack,
+    });
+    backendLogger.info('Returning fallback extraction data', {
+      file: 'src/services/aiService.ts', function: 'extractFromPdf',
+    });
     return getFallbackData();
   }
 }

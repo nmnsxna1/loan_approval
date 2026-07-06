@@ -7,6 +7,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import type { Application } from '../../types';
 import toast from 'react-hot-toast';
 import { CheckCircle, XCircle, ArrowUpRight, AlertTriangle, Loader2 } from 'lucide-react';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 export default function ReviewApplications() {
   const [apps, setApps] = useState<Application[]>([]);
@@ -17,8 +18,12 @@ export default function ReviewApplications() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    logger.info('ReviewApplications page mounted', { file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'ReviewApplications' });
     api.get('/applications', { params: { status: 'SUBMITTED', limit: 100 } })
-      .then((r) => setApps(r.data.data)).finally(() => setLoading(false));
+      .then((r) => {
+        apiLogger.info(`Review apps loaded: ${r.data.data.length} pending`, { file: 'src/pages/policy-manager/ReviewApplications.tsx' });
+        setApps(r.data.data);
+      }).finally(() => setLoading(false));
   }, []);
 
   const handleAction = async () => {
@@ -28,6 +33,9 @@ export default function ReviewApplications() {
       return;
     }
     setSubmitting(true);
+    apiLogger.info(`Review action: ${action} on application #${selected.applicationNo}`, {
+      file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'handleAction',
+    });
     try {
       if (action === 'approve') await api.post(`/applications/${selected.id}/approve`);
       else if (action === 'reject') await api.post(`/applications/${selected.id}/reject`, { reason });
@@ -36,6 +44,10 @@ export default function ReviewApplications() {
       setApps((p) => p.filter((a) => a.id !== selected.id));
       setSelected(null); setAction(null); setReason('');
     } catch (err: any) {
+      errorLogger.error(`Review action failed: ${action}`, {
+        file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'handleAction',
+        message: err.response?.data?.message || err.message,
+      });
       toast.error(err.response?.data?.message || 'Action failed');
     } finally {
       setSubmitting(false);

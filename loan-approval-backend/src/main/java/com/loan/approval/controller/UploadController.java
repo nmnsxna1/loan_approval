@@ -43,26 +43,33 @@ public class UploadController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication) {
 
+        String username = authentication.getName();
+        log.info("Upload request received from user: {}, fileName: {}, size: {}",
+                username, file.getOriginalFilename(), file.getSize());
+
         if (file.isEmpty()) {
+            log.warn("Upload failed: file is empty from user: {}", username);
             return ResponseEntity.badRequest().body(
                     UploadResponse.builder().message("File is empty").build());
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !contentType.equals("application/pdf")) {
+            log.warn("Upload failed: invalid file type {} from user: {}", contentType, username);
             return ResponseEntity.badRequest().body(
                     UploadResponse.builder().message("Only PDF files are allowed").build());
         }
 
         if (file.getSize() > fileStorageProperties.getMaxFileSize()) {
+            log.warn("Upload failed: file size {} exceeds limit from user: {}", file.getSize(), username);
             return ResponseEntity.badRequest().body(
                     UploadResponse.builder().message("File exceeds maximum size of 20MB").build());
         }
 
-        String username = authentication.getName();
         User user = (User) userDetailsService.loadUserByUsername(username);
 
         String filePath = fileStorageService.storeFile(file);
+        log.info("File stored at: {} for user: {}", filePath, username);
 
         LoanApplication application = LoanApplication.builder()
                 .user(user)
@@ -73,12 +80,14 @@ public class UploadController {
                 .build();
 
         application = workflowService.submitApplication(application);
+        log.info("Application {} created for user: {}", application.getId(), username);
 
         try {
+            log.info("Starting AI extraction for application: {}", application.getId());
             ExtractedData extractedData = aiService.extractDataFromPdf(filePath);
 
             if (extractedData.getError() != null) {
-                log.warn("AI extraction had errors: {}", extractedData.getError());
+                log.warn("AI extraction had errors for application {}: {}", application.getId(), extractedData.getError());
             }
 
             application.setName(extractedData.getName());
@@ -92,6 +101,8 @@ public class UploadController {
             application.setEmployer(extractedData.getEmployer());
 
             ValidationResult validationResult = validationEngine.validate(extractedData);
+            log.info("Validation result for application {}: valid={}, riskScore={}",
+                    application.getId(), validationResult.isValid(), validationResult.getRiskScore());
 
             application.setRiskScore(validationResult.getRiskScore());
             application.setRiskLevel(validationResult.getRiskLevel());
@@ -111,11 +122,17 @@ public class UploadController {
                 validationErrorRepository.save(ve);
             }
 
+            if (!validationResult.getErrors().isEmpty()) {
+                log.warn("Validation errors for application {}: {}", application.getId(), validationResult.getErrors());
+            }
+
             workflowService.processValidation(application.getId(),
                     validationResult.isValid(), validationResult.getErrors());
 
+            log.info("Application {} processed successfully", application.getId());
+
         } catch (Exception e) {
-            log.error("Error processing application {}: {}", application.getId(), e.getMessage());
+            log.error("Error processing application {}: {}", application.getId(), e.getMessage(), e);
             application.setStatus(com.loan.approval.dto.enums.LoanStatus.POLICY_REVIEW);
             applicationRepository.save(application);
         }

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, User, Lock, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { logger, authLogger } from '../utils/logger';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -12,15 +13,26 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    logger.info('Login page mounted', { file: 'src/pages/Login.tsx', function: 'Login' });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    authLogger.info('Login form submitted', {
+      file: 'src/pages/Login.tsx', function: 'handleSubmit', url: '/login',
+    });
     try {
       const role = await login(username, password);
       const paths: Record<string, string> = { APPLICANT: '/applicant', POLICY_MANAGER: '/policy-manager', MAIN_MANAGER: '/main-manager' };
       toast.success(`Welcome, ${username}!`);
       navigate(paths[role] || '/');
     } catch (err: any) {
+      authLogger.warn('Login form submission failed', {
+        file: 'src/pages/Login.tsx', function: 'handleSubmit',
+        message: err.response?.data?.message || 'Invalid credentials',
+      });
       toast.error(err.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);

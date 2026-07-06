@@ -1,12 +1,32 @@
 import { LogOut, Moon, Sun, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    logger.info('Navbar mounted', { file: 'src/components/Navbar.tsx', function: 'Navbar' });
+  }, []);
+
+  const handleToggle = () => {
+    logger.info(`Theme toggle clicked (to ${dark ? 'light' : 'dark'})`, {
+      file: 'src/components/Navbar.tsx', function: 'handleToggle',
+    });
+    toggle();
+  };
+
+  const handleLogout = () => {
+    setOpen(false);
+    logger.info('Logout button clicked', {
+      file: 'src/components/Navbar.tsx', function: 'handleLogout', userId: user?.username,
+    });
+    logout();
+  };
 
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between px-6">
@@ -18,7 +38,7 @@ export default function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <button onClick={toggle} className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
+        <button onClick={handleToggle} className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700">
           {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
 
@@ -37,7 +57,7 @@ export default function Navbar() {
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 z-20 py-1">
                   <div className="px-4 py-2 text-xs text-gray-400 uppercase tracking-wider">{user.role.replace('_', ' ')}</div>
                   <hr className="border-gray-200 dark:border-slate-700" />
-                  <button onClick={() => { setOpen(false); logout(); }} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                  <button onClick={handleLogout} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                     <LogOut className="w-4 h-4" /> Sign Out
                   </button>
                 </div>

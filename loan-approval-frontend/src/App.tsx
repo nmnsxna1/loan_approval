@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -14,6 +15,7 @@ import PolicySearch from './pages/policy-manager/SearchApplications';
 import MainDashboard from './pages/main-manager/Dashboard';
 import EscalatedCases from './pages/main-manager/EscalatedCases';
 import MainSearch from './pages/main-manager/SearchApplications';
+import { logger } from './utils/logger';
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -23,6 +25,16 @@ function RootRedirect() {
 }
 
 function AppRoutes() {
+  const location = useLocation();
+
+  useEffect(() => {
+    logger.info(`Page navigation: ${location.pathname}`, {
+      file: 'src/App.tsx',
+      function: 'AppRoutes',
+      url: location.pathname,
+    });
+  }, [location.pathname]);
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -53,6 +65,8 @@ function AppRoutes() {
 }
 
 export default function App() {
+  logger.info('App component mounted', { file: 'src/App.tsx', function: 'App' });
+
   return (
     <ThemeProvider>
       <AuthProvider>

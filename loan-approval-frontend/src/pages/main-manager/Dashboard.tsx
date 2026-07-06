@@ -3,13 +3,18 @@ import api from '../../api/axios';
 import { CardSkeleton } from '../../components/LoadingSkeleton';
 import type { MainDashboard } from '../../types';
 import { AlertTriangle, CheckCircle2, XCircle, DollarSign } from 'lucide-react';
+import { logger, apiLogger } from '../../utils/logger';
 
 export default function MainManagerDashboard() {
   const [data, setData] = useState<MainDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/applications/dashboard').then((r) => setData(r.data)).finally(() => setLoading(false));
+    logger.info('MainManagerDashboard mounted', { file: 'src/pages/main-manager/Dashboard.tsx', function: 'MainManagerDashboard' });
+    api.get('/applications/dashboard').then((r) => {
+      apiLogger.info('Main dashboard data loaded', { file: 'src/pages/main-manager/Dashboard.tsx' });
+      setData(r.data);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return (

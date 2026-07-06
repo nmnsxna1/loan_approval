@@ -1,5 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 
 interface Props {
   open: boolean;
@@ -29,8 +30,22 @@ export default function ConfirmDialog({ open, title, message, confirmLabel = 'Co
 
   const c = colors[variant];
 
+  const handleConfirm = () => {
+    logger.info(`Confirm dialog confirmed: ${title}`, {
+      file: 'src/components/ConfirmDialog.tsx', function: 'handleConfirm',
+    });
+    onConfirm();
+  };
+
+  const handleCancel = () => {
+    logger.info(`Confirm dialog cancelled: ${title}`, {
+      file: 'src/components/ConfirmDialog.tsx', function: 'handleCancel',
+    });
+    onCancel();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={handleCancel}>
       <div ref={ref} className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-4">
           <div className={`p-2 rounded-full ${c.bg} ${c.text}`}>
@@ -40,13 +55,13 @@ export default function ConfirmDialog({ open, title, message, confirmLabel = 'Co
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{message}</p>
           </div>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+          <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onCancel} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600">
+          <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600">
             {cancelLabel}
           </button>
-          <button onClick={onConfirm} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${c.btn}`}>
+          <button onClick={handleConfirm} className={`px-4 py-2 text-sm font-medium text-white rounded-lg ${c.btn}`}>
             {confirmLabel}
           </button>
         </div>

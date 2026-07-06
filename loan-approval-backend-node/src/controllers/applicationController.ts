@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { STATUS } from '../config/auth';
+import { backendLogger, apiLogger, dbLogger } from '../utils/logger';
 import { validateApplication } from '../services/validationEngine';
 import { submitApplication, approveApplication, rejectApplication, escalateApplication, addHistory, createAuditLog } from '../services/workflowService';
 
@@ -10,6 +11,13 @@ const prisma = new PrismaClient();
 export async function getDashboard(req: AuthRequest, res: Response) {
   const userId = req.user!.id;
   const role = req.user!.role;
+
+  apiLogger.info(`Dashboard requested for ${role} ${userId}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'getDashboard',
+    userId,
+    requestId: (req as any).requestId,
+  });
 
   if (role === 'APPLICANT') {
     const apps = await prisma.application.findMany({ where: { userId } });
@@ -77,6 +85,13 @@ export async function getApplications(req: AuthRequest, res: Response) {
     prisma.application.count({ where }),
   ]);
 
+  apiLogger.info(`Applications listed: ${total} total for ${role}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'getApplications',
+    userId,
+    requestId: (req as any).requestId,
+  });
+
   res.json({
     data,
     pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
@@ -95,7 +110,21 @@ export async function getApplicationById(req: AuthRequest, res: Response) {
       user: { select: { username: true, email: true } },
     },
   });
-  if (!app) return res.status(404).json({ message: 'Application not found' });
+  if (!app) {
+    apiLogger.warn(`Application not found: ${id}`, {
+      file: 'src/controllers/applicationController.ts',
+      function: 'getApplicationById',
+      userId: req.user!.id,
+      requestId: (req as any).requestId,
+    });
+    return res.status(404).json({ message: 'Application not found' });
+  }
+  apiLogger.info(`Application ${id} retrieved`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'getApplicationById',
+    userId: req.user!.id,
+    requestId: (req as any).requestId,
+  });
   res.json(app);
 }
 
@@ -113,6 +142,13 @@ export async function createApplication(req: AuthRequest, res: Response) {
 
   await addHistory({ applicationId: app.id, status: STATUS.DRAFT, action: 'CREATED', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
 
+  apiLogger.info(`Application created: ${app.id}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'createApplication',
+    userId,
+    requestId: (req as any).requestId,
+  });
+
   res.status(201).json(app);
 }
 
@@ -120,13 +156,29 @@ export async function updateApplication(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const data = req.body;
   const app = await prisma.application.findUnique({ where: { id } });
-  if (!app) return res.status(404).json({ message: 'Application not found' });
-  if (app.status !== STATUS.DRAFT) return res.status(400).json({ message: 'Only draft applications can be edited' });
+  if (!app) {
+    apiLogger.warn(`Application not found for update: ${id}`, {
+      file: 'src/controllers/applicationController.ts',
+      function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+    });
+    return res.status(404).json({ message: 'Application not found' });
+  }
+  if (app.status !== STATUS.DRAFT) {
+    apiLogger.warn(`Cannot update non-draft application: ${id}`, {
+      file: 'src/controllers/applicationController.ts',
+      function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+    });
+    return res.status(400).json({ message: 'Only draft applications can be edited' });
+  }
 
   if (data.monthlyIncome !== undefined) data.monthlyIncome = parseFloat(data.monthlyIncome) || 0;
   if (data.loanAmount !== undefined) data.loanAmount = parseFloat(data.loanAmount) || 0;
 
   const updated = await prisma.application.update({ where: { id }, data });
+  apiLogger.info(`Application ${id} updated`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json(updated);
 }
 
@@ -145,6 +197,11 @@ export async function handleSubmit(req: AuthRequest, res: Response) {
   await addHistory({ applicationId: id, status: STATUS.SUBMITTED, action: 'SUBMITTED', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
   await createAuditLog({ applicationId: id, action: 'APPLICATION_SUBMITTED', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
 
+  apiLogger.info(`Application ${id} submitted`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleSubmit', userId: req.user!.id, requestId: (req as any).requestId,
+  });
+
   res.json({ application: finalApp, validation });
 }
 
@@ -152,6 +209,10 @@ export async function handleApprove(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const updated = await approveApplication(id, req.user!.id, req.user!.role, req.user!.username);
   await createAuditLog({ applicationId: id, action: 'APPROVED', performedBy: req.user!.username, performedByRole: req.user!.role });
+  apiLogger.info(`Application ${id} approved by ${req.user!.username}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleApprove', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json(updated);
 }
 
@@ -160,6 +221,10 @@ export async function handleReject(req: AuthRequest, res: Response) {
   const { reason } = req.body;
   const updated = await rejectApplication(id, req.user!.id, req.user!.role, req.user!.username, reason);
   await createAuditLog({ applicationId: id, action: 'REJECTED', performedBy: req.user!.username, performedByRole: req.user!.role });
+  apiLogger.info(`Application ${id} rejected by ${req.user!.username}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleReject', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json(updated);
 }
 
@@ -168,6 +233,10 @@ export async function handleEscalate(req: AuthRequest, res: Response) {
   const { reason } = req.body;
   const updated = await escalateApplication(id, req.user!.id, req.user!.username, reason);
   await createAuditLog({ applicationId: id, action: 'ESCALATED', performedBy: req.user!.username, performedByRole: req.user!.role });
+  apiLogger.info(`Application ${id} escalated by ${req.user!.username}`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleEscalate', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json(updated);
 }
 
@@ -180,11 +249,15 @@ export async function getHistory(req: AuthRequest, res: Response) {
   res.json(history);
 }
 
-export async function getAuditLogs(_req: AuthRequest, res: Response) {
+export async function getAuditLogs(req: AuthRequest, res: Response) {
   const logs = await prisma.auditLog.findMany({
     orderBy: { createdAt: 'desc' },
     take: 100,
     include: { user: { select: { username: true } }, application: { select: { applicationNo: true } } },
+  });
+  apiLogger.info(`Audit logs retrieved (${logs.length} entries)`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'getAuditLogs', userId: req.user!.id, requestId: (req as any).requestId,
   });
   res.json(logs);
 }
@@ -204,6 +277,10 @@ export async function handleDelete(req: AuthRequest, res: Response) {
   await prisma.document.deleteMany({ where: { applicationId: id } });
   await prisma.application.delete({ where: { id } });
 
+  apiLogger.info(`Application ${id} deleted`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleDelete', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json({ message: 'Application deleted' });
 }
 
@@ -221,5 +298,9 @@ export async function handleWithdraw(req: AuthRequest, res: Response) {
   await addHistory({ applicationId: id, status: STATUS.DRAFT, action: 'WITHDRAWN', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
   await createAuditLog({ applicationId: id, action: 'APPLICATION_WITHDRAWN', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
 
+  apiLogger.info(`Application ${id} withdrawn`, {
+    file: 'src/controllers/applicationController.ts',
+    function: 'handleWithdraw', userId: req.user!.id, requestId: (req as any).requestId,
+  });
   res.json(updated);
 }

@@ -75,11 +75,18 @@ public class ValidationEngine {
         int riskScore = calculateRiskScore(data, errors);
         RiskLevel riskLevel = calculateRiskLevel(riskScore, errors);
 
+        boolean valid = errors.isEmpty();
+        if (!valid) {
+            log.warn("Validation failed: {} error(s), riskScore={}, riskLevel={}", errors.size(), riskScore, riskLevel);
+        } else {
+            log.info("Validation passed: riskScore={}, riskLevel={}", riskScore, riskLevel);
+        }
+
         return ValidationResult.builder()
                 .errors(errors)
                 .riskScore(riskScore)
                 .riskLevel(riskLevel)
-                .valid(errors.isEmpty())
+                .valid(valid)
                 .build();
     }
 

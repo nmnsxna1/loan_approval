@@ -11,6 +11,7 @@ import type { Application } from '../../types';
 import { useDebounce } from '../../hooks/useDebounce';
 import { Eye, Pencil, Trash2, XCircle } from 'lucide-react';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 export default function MyApplications() {
   const [apps, setApps] = useState<Application[]>([]);
@@ -23,21 +24,31 @@ export default function MyApplications() {
   const navigate = useNavigate();
   const [confirm, setConfirm] = useState<{ action: string; id: string; appNo?: number } | null>(null);
 
+  useEffect(() => {
+    logger.info('MyApplications page mounted', { file: 'src/pages/applicant/MyApplications.tsx', function: 'MyApplications' });
+  }, []);
+
   const fetchApps = () => {
     setLoading(true);
     api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 } })
-      .then((r) => { setApps(r.data.data); setTotalPages(r.data.pagination.totalPages || 1); })
+      .then((r) => {
+        const total = r.data.pagination.totalPages || 1;
+        apiLogger.info(`Applications fetched: page ${page}/${total}`, { file: 'src/pages/applicant/MyApplications.tsx', function: 'fetchApps' });
+        setApps(r.data.data); setTotalPages(total);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
   const handleDelete = async () => {
     if (!confirm) return;
+    logger.info(`Deleting application #${confirm.appNo}`, { file: 'src/pages/applicant/MyApplications.tsx', function: 'handleDelete' });
     try {
       await api.delete(`/applications/${confirm.id}`);
       toast.success('Application deleted');
       fetchApps();
     } catch (err: any) {
+      errorLogger.error('Delete failed', { file: 'src/pages/applicant/MyApplications.tsx', function: 'handleDelete', message: err.message });
       toast.error(err.response?.data?.message || 'Delete failed');
     }
     setConfirm(null);
@@ -45,11 +56,13 @@ export default function MyApplications() {
 
   const handleWithdraw = async () => {
     if (!confirm) return;
+    logger.info(`Withdrawing application #${confirm.appNo}`, { file: 'src/pages/applicant/MyApplications.tsx', function: 'handleWithdraw' });
     try {
       await api.post(`/applications/${confirm.id}/withdraw`);
       toast.success('Application withdrawn');
       fetchApps();
     } catch (err: any) {
+      errorLogger.error('Withdraw failed', { file: 'src/pages/applicant/MyApplications.tsx', function: 'handleWithdraw', message: err.message });
       toast.error(err.response?.data?.message || 'Withdraw failed');
     }
     setConfirm(null);

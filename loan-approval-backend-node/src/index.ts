@@ -2,12 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import dotenv from 'dotenv';
+import { v4 as uuidv4 } from 'uuid';
 import { PrismaClient } from '@prisma/client';
 import authRoutes from './routes/auth';
 import applicationRoutes from './routes/applications';
 import uploadRoutes from './routes/upload';
 import { errorHandler } from './middleware/errorHandler';
-import { info, error as logError } from './utils/logger';
+import { backendLogger, apiLogger, dbLogger, errorLogger } from './utils/logger';
 
 dotenv.config();
 
@@ -19,12 +20,40 @@ app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001', 'http:
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, _res, next) => {
+  (req as any).requestId = uuidv4();
+  next();
+});
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  const { method, originalUrl } = req;
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    apiLogger.info(`${method} ${originalUrl} -> ${res.statusCode}`, {
+      requestId: (req as any).requestId,
+      url: originalUrl,
+      userId: (req as any).user?.id,
+      file: 'src/index.ts',
+      function: 'apiMiddleware',
+    });
+    perfLogger?.info(`API ${method} ${originalUrl} took ${duration}ms`, {
+      requestId: (req as any).requestId,
+      file: 'src/index.ts',
+    });
+  });
+  next();
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', (req, res) => {
+  apiLogger.info('Health check', { requestId: (req as any).requestId, url: '/api/health', file: 'src/index.ts' });
+  res.json({ status: 'ok' });
+});
 
 app.get('/api/debug/llm', async (_req, res) => {
   try {
@@ -67,14 +96,34 @@ app.use(errorHandler);
 
 async function main() {
   await prisma.$connect();
-  info('Connected to database');
+  dbLogger.info('Connected to database', { file: 'src/index.ts' });
 
   app.listen(PORT, () => {
-    info(`Server running on http://localhost:${PORT}`);
+    backendLogger.info(`Server running on http://localhost:${PORT}`, {
+      file: 'src/index.ts',
+      function: 'main',
+    });
   });
 }
 
 main().catch((err) => {
-  console.error('Failed to start server', err);
+  errorLogger.fatal('Failed to start server', {
+    file: 'src/index.ts',
+    function: 'main',
+    message: err.message,
+    stack: err.stack,
+  });
   process.exit(1);
+});
+
+process.on('SIGINT', () => {
+  backendLogger.info('Server shutting down (SIGINT)', { file: 'src/index.ts' });
+  prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  backendLogger.info('Server shutting down (SIGTERM)', { file: 'src/index.ts' });
+  prisma.$disconnect();
+  process.exit(0);
 });

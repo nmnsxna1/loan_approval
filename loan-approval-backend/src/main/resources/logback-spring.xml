@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOG_DIR" value="${LOG_PATH:-../logs}" />
+    <property name="LOG_PATTERN" value="[%d{yyyy-MM-dd HH:mm:ss}]%nLEVEL: %p%nTYPE: %X{logType:-Backend}%nFILE: %F%nFUNCTION: %M%nLINE: %L%nMESSAGE: %msg%n%n" />
+    <property name="CONSOLE_PATTERN" value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="BACKEND_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/backend.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/%d{yyyy-MM-dd}-backend.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="API_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/api.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/%d{yyyy-MM-dd}-api.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="DATABASE_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/database.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/%d{yyyy-MM-dd}-database.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="AUTH_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/authentication.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/%d{yyyy-MM-dd}-authentication.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <file>${LOG_DIR}/error.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/%d{yyyy-MM-dd}-error.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="com.loan.approval.controller" level="${LOG_LEVEL_CONTROLLER:-INFO}" additivity="false">
+        <appender-ref ref="API_FILE" />
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ERROR_FILE" />
+    </logger>
+
+    <logger name="com.loan.approval.service" level="${LOG_LEVEL_SERVICE:-INFO}" additivity="false">
+        <appender-ref ref="BACKEND_FILE" />
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ERROR_FILE" />
+    </logger>
+
+    <logger name="com.loan.approval.repository" level="${LOG_LEVEL_REPOSITORY:-INFO}" additivity="false">
+        <appender-ref ref="DATABASE_FILE" />
+        <appender-ref ref="ERROR_FILE" />
+    </logger>
+
+    <logger name="com.loan.approval.security" level="${LOG_LEVEL_SECURITY:-INFO}" additivity="false">
+        <appender-ref ref="AUTH_FILE" />
+        <appender-ref ref="CONSOLE" />
+        <appender-ref ref="ERROR_FILE" />
+    </logger>
+
+    <logger name="com.loan.approval.exception" level="${LOG_LEVEL_EXCEPTION:-ERROR}" additivity="false">
+        <appender-ref ref="ERROR_FILE" />
+        <appender-ref ref="CONSOLE" />
+    </logger>
+
+    <logger name="com.loan.approval.email" level="${LOG_LEVEL_EMAIL:-INFO}" additivity="false">
+        <appender-ref ref="BACKEND_FILE" />
+        <appender-ref ref="CONSOLE" />
+    </logger>
+
+    <logger name="com.loan.approval.runner" level="${LOG_LEVEL_RUNNER:-INFO}" additivity="false">
+        <appender-ref ref="BACKEND_FILE" />
+        <appender-ref ref="CONSOLE" />
+    </logger>
+
+    <root level="${LOG_LEVEL:-INFO}">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>

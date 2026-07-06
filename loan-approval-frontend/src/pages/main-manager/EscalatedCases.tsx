@@ -6,6 +6,7 @@ import EmptyState from '../../components/EmptyState';
 import type { Application } from '../../types';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 export default function EscalatedCases() {
   const [apps, setApps] = useState<Application[]>([]);
@@ -16,14 +17,21 @@ export default function EscalatedCases() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    logger.info('EscalatedCases page mounted', { file: 'src/pages/main-manager/EscalatedCases.tsx', function: 'EscalatedCases' });
     api.get('/applications', { params: { status: 'ESCALATED', limit: 100 } })
-      .then((r) => setApps(r.data.data)).finally(() => setLoading(false));
+      .then((r) => {
+        apiLogger.info(`Escalated cases loaded: ${r.data.data.length}`, { file: 'src/pages/main-manager/EscalatedCases.tsx' });
+        setApps(r.data.data);
+      }).finally(() => setLoading(false));
   }, []);
 
   const handleAction = async () => {
     if (!selected || !action) return;
     if (action === 'reject' && !reason.trim()) { toast.error('Rejection reason is mandatory'); return; }
     setSubmitting(true);
+    apiLogger.info(`Main manager action: ${action} on escalated #${selected.applicationNo}`, {
+      file: 'src/pages/main-manager/EscalatedCases.tsx', function: 'handleAction',
+    });
     try {
       if (action === 'approve') await api.post(`/applications/${selected.id}/approve`);
       else await api.post(`/applications/${selected.id}/reject`, { reason });
@@ -31,6 +39,10 @@ export default function EscalatedCases() {
       setApps((p) => p.filter((a) => a.id !== selected.id));
       setSelected(null); setAction(null); setReason('');
     } catch (err: any) {
+      errorLogger.error(`Main manager action failed: ${action}`, {
+        file: 'src/pages/main-manager/EscalatedCases.tsx', function: 'handleAction',
+        message: err.response?.data?.message || err.message,
+      });
       toast.error(err.response?.data?.message || 'Action failed');
     } finally {
       setSubmitting(false);

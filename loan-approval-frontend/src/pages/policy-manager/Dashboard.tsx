@@ -3,13 +3,18 @@ import api from '../../api/axios';
 import { CardSkeleton } from '../../components/LoadingSkeleton';
 import type { PolicyDashboard } from '../../types';
 import { Clock, CheckCircle2, XCircle, AlertTriangle, Eye } from 'lucide-react';
+import { logger, apiLogger } from '../../utils/logger';
 
 export default function PolicyManagerDashboard() {
   const [data, setData] = useState<PolicyDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/applications/dashboard').then((r) => setData(r.data)).finally(() => setLoading(false));
+    logger.info('PolicyManagerDashboard mounted', { file: 'src/pages/policy-manager/Dashboard.tsx', function: 'PolicyManagerDashboard' });
+    api.get('/applications/dashboard').then((r) => {
+      apiLogger.info('Policy dashboard data loaded', { file: 'src/pages/policy-manager/Dashboard.tsx' });
+      setData(r.data);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) return (

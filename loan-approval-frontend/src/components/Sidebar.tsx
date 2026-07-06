@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, FilePlus, Files, ClipboardCheck, Search, AlertTriangle, BarChart3, History } from 'lucide-react';
+import { logger } from '../utils/logger';
 
 const menus: Record<string, { label: string; icon: any; path: string }[]> = {
   APPLICANT: [
@@ -26,6 +27,16 @@ export default function Sidebar() {
   const location = useLocation();
   const items = menus[user?.role || ''] || [];
 
+  const handleNav = (path: string, label: string) => {
+    logger.info(`Sidebar navigation: ${label} -> ${path}`, {
+      file: 'src/components/Sidebar.tsx',
+      function: 'handleNav',
+      url: path,
+      userId: user?.username,
+    });
+    navigate(path);
+  };
+
   return (
     <aside className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 flex flex-col">
       <nav className="flex-1 px-3 py-4 space-y-1">
@@ -34,7 +45,7 @@ export default function Sidebar() {
           return (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNav(item.path, item.label)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
                   ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'

@@ -7,6 +7,7 @@ import { TableSkeleton } from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { Application } from '../../types';
+import { logger, apiLogger } from '../../utils/logger';
 
 export default function MainSearch() {
   const [apps, setApps] = useState<Application[]>([]);
@@ -18,9 +19,16 @@ export default function MainSearch() {
   const debouncedSearch = useDebounce(search, 400);
 
   useEffect(() => {
+    logger.info('MainSearch page mounted', { file: 'src/pages/main-manager/SearchApplications.tsx', function: 'MainSearch' });
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 } })
-      .then((r) => { setApps(r.data.data); setTotalPages(r.data.pagination.totalPages || 1); })
+      .then((r) => {
+        apiLogger.info(`Main search results: ${r.data.data.length} apps (page ${page})`, { file: 'src/pages/main-manager/SearchApplications.tsx' });
+        setApps(r.data.data); setTotalPages(r.data.pagination.totalPages || 1);
+      })
       .finally(() => setLoading(false));
   }, [debouncedSearch, statusFilter, page]);
 

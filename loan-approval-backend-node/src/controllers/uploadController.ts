@@ -3,13 +3,18 @@ import { PrismaClient } from '@prisma/client';
 import { AuthRequest } from '../middleware/auth';
 import { extractFromPdf } from '../services/aiService';
 import { STATUS } from '../config/auth';
-import { info, error } from '../utils/logger';
+import { backendLogger, apiLogger, errorLogger } from '../utils/logger';
 
 const prisma = new PrismaClient();
 
 export async function uploadFile(req: AuthRequest, res: Response) {
   if (!req.file) {
-    error('Upload failed: No file in request');
+    errorLogger.error('Upload failed: No file in request', {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile',
+      userId: req.user!.id,
+      requestId: (req as any).requestId,
+    });
     return res.status(400).json({ message: 'No file uploaded' });
   }
 
@@ -18,7 +23,12 @@ export async function uploadFile(req: AuthRequest, res: Response) {
   const fileName = req.file.originalname;
   const fileSize = req.file.size;
 
-  info('Upload request received', JSON.stringify({ userId, fileName, fileSize, filePath }));
+  backendLogger.info(`Upload request: ${fileName} (${fileSize} bytes)`, {
+    file: 'src/controllers/uploadController.ts',
+    function: 'uploadFile',
+    userId,
+    requestId: (req as any).requestId,
+  });
 
   let app;
   try {
@@ -31,9 +41,16 @@ export async function uploadFile(req: AuthRequest, res: Response) {
         pdfSize: fileSize,
       },
     });
-    info('Application record created', app.id);
+    backendLogger.info(`Application record created: ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
   } catch (err: any) {
-    error('Failed to create application record', err.message);
+    errorLogger.error('Failed to create application record', {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+      message: err.message, stack: err.stack,
+    });
     return res.status(500).json({ message: 'Failed to create application' });
   }
 
@@ -41,15 +58,27 @@ export async function uploadFile(req: AuthRequest, res: Response) {
     await prisma.document.create({
       data: { applicationId: app.id, filePath, fileName, fileSize },
     });
-    info('Document record created for application', app.id);
+    backendLogger.info(`Document record created for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
   } catch (err: any) {
-    error('Failed to create document record', err.message);
+    errorLogger.error('Failed to create document record', {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, message: err.message,
+    });
   }
 
   try {
-    info('Starting AI extraction for application ' + app.id);
+    apiLogger.info(`Starting AI extraction for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
     const { extracted, risk } = await extractFromPdf(filePath);
-    info('AI extraction succeeded', JSON.stringify({ applicantName: extracted.applicantName, confidence: extracted.confidence }));
+    apiLogger.info(`AI extraction succeeded for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
 
     await prisma.application.update({
       where: { id: app.id },
@@ -70,7 +99,10 @@ export async function uploadFile(req: AuthRequest, res: Response) {
         bankDetails: extracted.bankDetails,
       },
     });
-    info('Application updated with extracted fields', app.id);
+    backendLogger.info(`Application ${app.id} updated with extracted fields`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
 
     let savedFields = 0;
     for (const [field, value] of Object.entries(extracted)) {
@@ -88,10 +120,16 @@ export async function uploadFile(req: AuthRequest, res: Response) {
         });
         savedFields++;
       } catch (dbErr: any) {
-        error('Failed to save extracted field', field, dbErr.message);
+        errorLogger.error(`Failed to save extracted field: ${field}`, {
+          file: 'src/controllers/uploadController.ts',
+          function: 'uploadFile', message: dbErr.message,
+        });
       }
     }
-    info('Extracted fields saved', JSON.stringify({ count: savedFields }));
+    backendLogger.info(`Extracted fields saved: ${savedFields} for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
 
     try {
       await prisma.riskAssessment.create({
@@ -110,15 +148,27 @@ export async function uploadFile(req: AuthRequest, res: Response) {
           creditAssessment: risk.creditAssessment,
         },
       });
-      info('Risk assessment saved for application', app.id);
+      backendLogger.info(`Risk assessment saved for application ${app.id}`, {
+        file: 'src/controllers/uploadController.ts',
+        function: 'uploadFile', userId, requestId: (req as any).requestId,
+      });
     } catch (dbErr: any) {
-      error('Failed to save risk assessment', dbErr.message);
+      errorLogger.error('Failed to save risk assessment', {
+        file: 'src/controllers/uploadController.ts',
+        function: 'uploadFile', message: dbErr.message,
+      });
     }
 
-    info('AI extraction completed for application ' + app.id);
+    apiLogger.info(`AI extraction completed for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+    });
   } catch (err: any) {
-    error('AI extraction failed for application ' + app.id, err.message);
-    error('Stack', err.stack);
+    errorLogger.error(`AI extraction failed for application ${app.id}`, {
+      file: 'src/controllers/uploadController.ts',
+      function: 'uploadFile', userId, requestId: (req as any).requestId,
+      message: err.message, stack: err.stack,
+    });
   }
 
   res.status(201).json({ applicationId: app.id, message: 'File uploaded and processed' });

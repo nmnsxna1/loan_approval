@@ -1,12 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { backendLogger } from './utils/logger';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const existing = await prisma.user.count();
-  if (existing > 0) {
-    console.log('Users already exist, skipping seed');
+  const existing = await prisma.user.findFirst();
+  if (existing) {
+    backendLogger.info('Users already exist, skipping seed', { file: 'src/seed.ts' });
     return;
   }
 
@@ -14,15 +15,15 @@ async function main() {
 
   await prisma.user.createMany({
     data: [
-      { username: 'applicant', password, email: 'applicant@loan.com', role: 'APPLICANT' },
-      { username: 'policy_manager', password, email: 'policy.manager@loan.com', role: 'POLICY_MANAGER' },
-      { username: 'main_manager', password, email: 'main.manager@loan.com', role: 'MAIN_MANAGER' },
+      { username: 'applicant', email: 'applicant@example.com', password, role: 'APPLICANT' },
+      { username: 'policy_manager', email: 'policy@example.com', password, role: 'POLICY_MANAGER' },
+      { username: 'main_manager', email: 'main@example.com', password, role: 'MAIN_MANAGER' },
     ],
   });
 
-  console.log('Seed users created successfully');
+  backendLogger.info('Seed users created successfully', { file: 'src/seed.ts' });
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
+  .catch((e) => backendLogger.error('Seed failed', { file: 'src/seed.ts', message: e.message, stack: e.stack }))
   .finally(() => prisma.$disconnect());
