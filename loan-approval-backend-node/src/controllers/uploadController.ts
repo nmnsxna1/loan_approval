@@ -28,7 +28,7 @@ export async function uploadFile(req: AuthRequest, res: Response) {
     requestId: req.requestId,
   });
 
-  let app;
+  let app: { id: string; applicantName?: string | null };
   try {
     app = await prisma.application.create({
       data: {
@@ -103,7 +103,7 @@ export async function uploadFile(req: AuthRequest, res: Response) {
       function: 'uploadFile', userId, requestId: req.requestId,
     });
 
-    const fieldData = [];
+    const fieldData: Array<{ applicationId: string; fieldName: string; fieldValue: string; confidence: number; needsVerification: boolean }> = [];
     for (const [field, value] of Object.entries(extracted)) {
       if (field === 'confidence') continue;
       const confidence = extracted.confidence[field] ?? 1;

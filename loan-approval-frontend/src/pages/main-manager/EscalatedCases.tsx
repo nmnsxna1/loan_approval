@@ -5,7 +5,7 @@ import { TableSkeleton } from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
 import type { Application } from '../../types';
 import toast from 'react-hot-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 export default function EscalatedCases() {
@@ -92,9 +92,12 @@ export default function EscalatedCases() {
       )}
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex bg-black/40" onClick={() => !submitting && setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex bg-black/40" onClick={() => !submitting && (setSelected(null), setAction(null), setReason(''))}>
           <div className="flex w-full h-full" onClick={(e) => e.stopPropagation()}>
-            <div className="w-1/2 bg-gray-100 dark:bg-slate-900 p-6 flex items-center justify-center">
+            <div className="relative w-1/2 bg-gray-100 dark:bg-slate-900 p-6 flex items-center justify-center">
+              <button onClick={() => { setSelected(null); setAction(null); setReason(''); }} className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                <X className="w-5 h-5" />
+              </button>
               <div className="text-center text-gray-400"><p className="text-lg">PDF Preview</p><p className="text-sm mt-1">{selected.pdfName}</p></div>
             </div>
             <div className="w-1/2 bg-white dark:bg-slate-800 overflow-auto p-6">

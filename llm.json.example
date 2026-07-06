@@ -1,0 +1,94 @@
+{
+  "_comment": [
+    "==================================================================================",
+    "  LLM (Large Language Model) Configuration File",
+    "  ==================================================================================",
+    "  This file configures which AI provider the system uses for PDF data extraction",
+    "  and risk analysis. The system supports multiple providers.",
+    "",
+    "  HOW TO USE:",
+    "    1. Copy this file:  cp llm.json.example llm.json",
+    "    2. Set 'active' to your preferred provider (e.g., 'gemini', 'openai', etc.)",
+    "    3. Fill in the 'apiKey' for your chosen provider (or use environment variables)",
+    "    4. Optionally override model, temperature, timeout, etc.",
+    "",
+    "  ENVIRONMENT VARIABLE OVERRIDES:",
+    "    API keys can be set via env vars instead of hardcoding them here:",
+    "      LLM_OPENAI_API_KEY       - For OpenAI provider",
+    "      LLM_ANTHROPIC_API_KEY    - For Anthropic/Claude provider",
+    "      LLM_GEMINI_API_KEY       - For Google Gemini provider",
+    "      LLM_API_KEY              - Generic fallback for any provider",
+    "      GEMINI_API_KEY           - Legacy fallback (Gemini only)",
+    "",
+    "  TIMEOUT BEHAVIOR:",
+    "    - timeoutMs = 0: Auto-detected based on URL",
+    "        - Local URLs (127.0.0.1, localhost): 3,600,000ms (1 hour)",
+    "        - Remote URLs: 60,000ms (1 minute)",
+    "    - timeoutMs > 0: Uses your specified value",
+    "=================================================================================="
+  ],
+
+  "active": "openai-compatible",
+
+  "providers": {
+    "openai": {
+      "_comment": "OpenAI API - https://platform.openai.com/",
+      "baseUrl": "https://api.openai.com",
+      "model": "gpt-4o",
+      "apiKey": "",
+      "temperature": 0.2,
+      "maxTokens": -1,
+      "timeoutMs": 0
+    },
+    "anthropic": {
+      "_comment": "Anthropic Claude API - https://console.anthropic.com/",
+      "baseUrl": "https://api.anthropic.com",
+      "model": "claude-3-5-sonnet-20241022",
+      "apiKey": "",
+      "temperature": 0.2,
+      "maxTokens": -1,
+      "timeoutMs": 0
+    },
+    "gemini": {
+      "_comment": "Google Gemini API - https://aistudio.google.com/",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "model": "gemini-2.0-flash",
+      "apiKey": "",
+      "temperature": 0.2,
+      "maxTokens": -1,
+      "timeoutMs": 0
+    },
+    "openai-compatible": {
+      "_comment": [
+        "OpenAI-compatible endpoints - Works with:",
+        "  - LM Studio (http://127.0.0.1:1234)",
+        "  - Ollama in OpenAI mode (http://127.0.0.1:11434)",
+        "  - LocalAI (http://127.0.0.1:8080)",
+        "  - vLLM, Text Generation WebUI, etc.",
+        "",
+        "Set timeout to 0 for auto-detection (local = 1hr, remote = 1min).",
+        "API key can be 'not-needed' for local servers."
+      ],
+      "baseUrl": "http://127.0.0.1:1234",
+      "model": "",
+      "apiKey": "not-needed",
+      "temperature": 0.2,
+      "maxTokens": -1,
+      "timeoutMs": 0
+    },
+    "ollama": {
+      "_comment": [
+        "Direct Ollama API - https://ollama.com/",
+        "Ensure Ollama is running locally.",
+        "Works with models like: llama3, mistral, mixtral, codellama, etc.",
+        "Pull models using: ollama pull llama3"
+      ],
+      "baseUrl": "http://127.0.0.1:11434",
+      "model": "llama3",
+      "apiKey": "not-needed",
+      "temperature": 0.2,
+      "maxTokens": -1,
+      "timeoutMs": 0
+    }
+  }
+}

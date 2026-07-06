@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma';
 import { STATUS } from '../config/auth';
 import { dbLogger } from '../utils/logger';
+import { AppError, NotFoundError, ValidationError } from '../utils/errors';
 
 export async function createAuditLog(params: {
   userId?: string;
@@ -27,8 +28,8 @@ export async function addHistory(params: {
 
 export async function submitApplication(applicationId: string) {
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
-  if (!app) throw new Error('Application not found');
-  if (app.status !== STATUS.DRAFT) throw new Error('Only draft applications can be submitted');
+  if (!app) throw new NotFoundError('Application not found');
+  if (app.status !== STATUS.DRAFT) throw new ValidationError('Only draft applications can be submitted');
 
   const updated = await prisma.application.update({
     where: { id: applicationId },
@@ -44,11 +45,11 @@ export async function submitApplication(applicationId: string) {
 
 export async function approveApplication(applicationId: string, userId: string, role: string, username: string) {
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
-  if (!app) throw new Error('Application not found');
+  if (!app) throw new NotFoundError('Application not found');
 
   if (role === 'POLICY_MANAGER') {
     if (app.status !== STATUS.SUBMITTED && app.status !== STATUS.UNDER_REVIEW) {
-      throw new Error('Application is not in reviewable status');
+      throw new ValidationError('Application is not in reviewable status');
     }
     const updated = await prisma.application.update({
       where: { id: applicationId },
@@ -62,7 +63,7 @@ export async function approveApplication(applicationId: string, userId: string, 
   }
 
   if (role === 'MAIN_MANAGER') {
-    if (app.status !== STATUS.ESCALATED) throw new Error('Application is not escalated');
+    if (app.status !== STATUS.ESCALATED) throw new ValidationError('Application is not escalated');
     const updated = await prisma.application.update({
       where: { id: applicationId },
       data: { status: STATUS.APPROVED, mainManagerId: userId, mainDecidedAt: new Date() },
@@ -74,17 +75,17 @@ export async function approveApplication(applicationId: string, userId: string, 
     return updated;
   }
 
-  throw new Error('Unauthorized action');
+  throw new AppError('Unauthorized action', 403);
 }
 
 export async function rejectApplication(applicationId: string, userId: string, role: string, username: string, reason: string) {
-  if (!reason || reason.trim() === '') throw new Error('Rejection reason is mandatory');
+  if (!reason || reason.trim() === '') throw new ValidationError('Rejection reason is mandatory');
 
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
-  if (!app) throw new Error('Application not found');
+  if (!app) throw new NotFoundError('Application not found');
 
   if (role === 'POLICY_MANAGER') {
-    if (app.status !== STATUS.SUBMITTED && app.status !== STATUS.UNDER_REVIEW) throw new Error('Invalid status');
+    if (app.status !== STATUS.SUBMITTED && app.status !== STATUS.UNDER_REVIEW) throw new ValidationError('Invalid status');
     const updated = await prisma.application.update({
       where: { id: applicationId },
       data: { status: STATUS.REJECTED, rejectReason: reason, policyManagerId: userId, policyDecidedAt: new Date() },
@@ -97,7 +98,7 @@ export async function rejectApplication(applicationId: string, userId: string, r
   }
 
   if (role === 'MAIN_MANAGER') {
-    if (app.status !== STATUS.ESCALATED) throw new Error('Application is not escalated');
+    if (app.status !== STATUS.ESCALATED) throw new ValidationError('Application is not escalated');
     const updated = await prisma.application.update({
       where: { id: applicationId },
       data: { status: STATUS.REJECTED, rejectReason: reason, mainManagerId: userId, mainDecidedAt: new Date() },
@@ -109,15 +110,15 @@ export async function rejectApplication(applicationId: string, userId: string, r
     return updated;
   }
 
-  throw new Error('Unauthorized action');
+  throw new AppError('Unauthorized action', 403);
 }
 
 export async function escalateApplication(applicationId: string, userId: string, username: string, reason: string) {
-  if (!reason || reason.trim() === '') throw new Error('Escalation reason is mandatory');
+  if (!reason || reason.trim() === '') throw new ValidationError('Escalation reason is mandatory');
 
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
-  if (!app) throw new Error('Application not found');
-  if (app.status !== STATUS.SUBMITTED && app.status !== STATUS.UNDER_REVIEW) throw new Error('Invalid status');
+  if (!app) throw new NotFoundError('Application not found');
+  if (app.status !== STATUS.SUBMITTED && app.status !== STATUS.UNDER_REVIEW) throw new ValidationError('Invalid status');
 
   const updated = await prisma.application.update({
     where: { id: applicationId },

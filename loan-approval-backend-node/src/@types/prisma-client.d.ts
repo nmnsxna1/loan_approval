@@ -1,14 +1,5 @@
 declare module '@prisma/client' {
-  export class PrismaClient {
-    constructor(options?: any);
-    $connect(): Promise<void>;
-    $disconnect(): Promise<void>;
-    user: any;
-    application: any;
-    auditLog: any;
-    applicationHistory: any;
-    extractedField: any;
-    document: any;
-    riskAssessment: any;
-  }
+  import { PrismaClient as PrismaClientClass } from '.prisma/client';
+  export * from '.prisma/client';
+  export const PrismaClient: typeof PrismaClientClass;
 }

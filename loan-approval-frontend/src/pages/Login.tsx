@@ -80,7 +80,7 @@ export default function Login() {
 
         <div className="mt-6 p-3 rounded-xl bg-gray-50 dark:bg-slate-700/50 text-xs text-gray-500 dark:text-gray-400">
           <p className="font-medium mb-1">Demo Credentials:</p>
-          <p>applicant / policy_manager / main_manager — Password: 123456</p>
+          <p>applicant1 / policymgr1 / mainmgr1 — Password: password123</p>
         </div>
       </div>
     </div>

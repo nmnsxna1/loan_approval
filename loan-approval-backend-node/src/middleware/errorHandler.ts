@@ -1,7 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { errorLogger, apiLogger } from '../utils/logger';
+import { AppError } from '../utils/errors';
 
 export function errorHandler(err: any, req: Request, res: Response, _next: NextFunction) {
+  // Handle custom AppError with proper HTTP status codes
+  if (err instanceof AppError) {
+    apiLogger.warn(`AppError: ${err.message} (${err.statusCode})`, {
+      file: 'src/middleware/errorHandler.ts',
+      function: 'errorHandler',
+      url: req.originalUrl,
+      requestId: (req as any).requestId,
+      userId: (req as any).user?.id,
+      statusCode: err.statusCode,
+    });
+    return res.status(err.statusCode).json({ message: err.message });
+  }
+
   errorLogger.error(err.message || 'Unknown error', {
     file: 'src/middleware/errorHandler.ts',
     function: 'errorHandler',

@@ -355,7 +355,17 @@ describe('API Integration Tests', () => {
 
       const res = await request(app)
         .post('/api/applications/app-1/submit')
-        .set('Authorization', `Bearer ${validToken}`);
+        .set('Authorization', `Bearer ${validToken}`)
+        .send({
+          applicantName: 'John Doe',
+          pan: 'ABCDE1234F',
+          email: 'john@example.com',
+          address: '123 Main St',
+          occupation: 'Software Engineer',
+          monthlyIncome: '75000',
+          loanAmount: '500000',
+          employer: 'Tech Corp',
+        });
 
       expect(res.status).toBe(200);
     });
@@ -414,55 +424,55 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(200);
     });
 
-    it('POST /api/applications/:id/submit returns 500 for already submitted application', async () => {
+    it('POST /api/applications/:id/submit returns 400 for already submitted application', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(mockSubmittedApp);
       const res = await request(app)
         .post('/api/applications/app-1/submit')
         .set('Authorization', `Bearer ${validToken}`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
 
-    it('POST /api/applications/:id/approve returns 500 for non-existent application', async () => {
+    it('POST /api/applications/:id/approve returns 404 for non-existent application', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(null);
       const res = await request(app)
         .post('/api/applications/nonexistent/approve')
         .set('Authorization', `Bearer ${pmToken}`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(404);
     });
 
-    it('POST /api/applications/:id/approve returns 500 for wrong status (DRAFT)', async () => {
+    it('POST /api/applications/:id/approve returns 400 for wrong status (DRAFT)', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(mockDraftApp);
       const res = await request(app)
         .post('/api/applications/app-1/approve')
         .set('Authorization', `Bearer ${pmToken}`);
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
 
-    it('POST /api/applications/:id/reject returns 500 for missing reason', async () => {
+    it('POST /api/applications/:id/reject returns 400 for missing reason', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(mockSubmittedApp);
       const res = await request(app)
         .post('/api/applications/app-1/reject')
         .set('Authorization', `Bearer ${pmToken}`)
         .send({});
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
 
-    it('POST /api/applications/:id/reject returns 500 for empty reason', async () => {
+    it('POST /api/applications/:id/reject returns 400 for empty reason', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(mockSubmittedApp);
       const res = await request(app)
         .post('/api/applications/app-1/reject')
         .set('Authorization', `Bearer ${pmToken}`)
         .send({ reason: '   ' });
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
 
-    it('POST /api/applications/:id/escalate returns 500 for missing reason', async () => {
+    it('POST /api/applications/:id/escalate returns 400 for missing reason', async () => {
       mockPrisma.application.findUnique.mockResolvedValue(mockSubmittedApp);
       const res = await request(app)
         .post('/api/applications/app-1/escalate')
         .set('Authorization', `Bearer ${pmToken}`)
         .send({});
-      expect(res.status).toBe(500);
+      expect(res.status).toBe(400);
     });
 
     it('POST /api/applications/:id/withdraw returns 400 for non-SUBMITTED application', async () => {

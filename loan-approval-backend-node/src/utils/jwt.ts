@@ -13,7 +13,7 @@ function getJwtSecret(): string {
 
 export function generateToken(payload: { id: string; username: string; role: string }): string {
   const secret = getJwtSecret();
-  const token = jwt.sign(payload, secret, { expiresIn: JWT_EXPIRES_IN as any });
+  const token = jwt.sign(payload, secret, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
   authLogger.info(`Token generated for ${payload.username} (${payload.role})`, {
     file: 'src/utils/jwt.ts',
     function: 'generateToken',

@@ -6,6 +6,39 @@ import { backendLogger, apiLogger } from '../utils/logger';
 import { validateApplication } from '../services/validationEngine';
 import { submitApplication, approveApplication, rejectApplication, escalateApplication, addHistory, createAuditLog } from '../services/workflowService';
 
+// Helper type for application records from Prisma queries
+interface AppRecord {
+  status: string;
+  updatedAt: Date;
+  submittedAt: Date | null;
+}
+
+/** Shared whitelist of safe fields for application create/update */
+const ALLOWED_APP_FIELDS = [
+  'applicantName', 'dob', 'gender', 'pan', 'aadhaar', 'phone', 'email',
+  'address', 'occupation', 'employer', 'monthlyIncome', 'loanAmount', 'loanPurpose', 'bankDetails'
+] as const;
+
+/** Parse numeric income/amount fields, returns 0 for invalid values */
+function parseNumericField(val: any): number {
+  if (val === undefined || val === null) return 0;
+  const parsed = parseFloat(val);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+/** Extract only whitelisted fields from request body (prevents malicious injection) */
+function sanitizeAppData(data: Record<string, any>): Record<string, any> {
+  const safe: Record<string, any> = {};
+  for (const field of ALLOWED_APP_FIELDS) {
+    if (data[field] !== undefined) {
+      safe[field] = data[field];
+    }
+  }
+  if (safe.monthlyIncome !== undefined) safe.monthlyIncome = parseNumericField(safe.monthlyIncome);
+  if (safe.loanAmount !== undefined) safe.loanAmount = parseNumericField(safe.loanAmount);
+  return safe;
+}
+
 export async function getDashboard(req: AuthRequest, res: Response) {
   const userId = req.user!.id;
   const role = req.user!.role;
@@ -19,9 +52,9 @@ export async function getDashboard(req: AuthRequest, res: Response) {
 
   if (role === 'APPLICANT') {
     const apps = await prisma.application.findMany({ where: { userId } });
-    const drafts = apps.filter(a => a.status === STATUS.DRAFT).length;
-    const submitted = apps.filter(a => a.status !== STATUS.DRAFT).length;
-    const lastSubmitted = apps.filter(a => a.submittedAt).sort((a, b) => (b.submittedAt?.getTime() || 0) - (a.submittedAt?.getTime() || 0))[0];
+    const drafts = apps.filter((a: AppRecord) => a.status === STATUS.DRAFT).length;
+    const submitted = apps.filter((a: AppRecord) => a.status !== STATUS.DRAFT).length;
+    const lastSubmitted = apps.filter((a: AppRecord) => a.submittedAt).sort((a: AppRecord, b: AppRecord) => (b.submittedAt?.getTime() || 0) - (a.submittedAt?.getTime() || 0))[0];
     res.json({
       pendingDrafts: drafts,
       submittedApplications: submitted,
@@ -32,21 +65,21 @@ export async function getDashboard(req: AuthRequest, res: Response) {
   } else if (role === 'POLICY_MANAGER') {
     const allApps = await prisma.application.findMany({ where: { status: { not: STATUS.DRAFT } } });
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const reviewedToday = allApps.filter(a => a.updatedAt >= today && (a.status === STATUS.APPROVED || a.status === STATUS.REJECTED || a.status === STATUS.ESCALATED));
+    const reviewedToday = allApps.filter((a: AppRecord) => a.updatedAt >= today && (a.status === STATUS.APPROVED || a.status === STATUS.REJECTED || a.status === STATUS.ESCALATED));
     res.json({
-      pendingApplications: allApps.filter(a => a.status === STATUS.SUBMITTED || a.status === STATUS.UNDER_REVIEW).length,
+      pendingApplications: allApps.filter((a: AppRecord) => a.status === STATUS.SUBMITTED || a.status === STATUS.UNDER_REVIEW).length,
       reviewedToday: reviewedToday.length,
-      escalatedCases: allApps.filter(a => a.status === STATUS.ESCALATED).length,
-      approvedCases: allApps.filter(a => a.status === STATUS.APPROVED).length,
-      rejectedCases: allApps.filter(a => a.status === STATUS.REJECTED).length,
+      escalatedCases: allApps.filter((a: AppRecord) => a.status === STATUS.ESCALATED).length,
+      approvedCases: allApps.filter((a: AppRecord) => a.status === STATUS.APPROVED).length,
+      rejectedCases: allApps.filter((a: AppRecord) => a.status === STATUS.REJECTED).length,
     });
   } else if (role === 'MAIN_MANAGER') {
     const allApps = await prisma.application.findMany();
     res.json({
-      pendingEscalated: allApps.filter(a => a.status === STATUS.ESCALATED).length,
-      approvedCases: allApps.filter(a => a.status === STATUS.APPROVED).length,
-      rejectedCases: allApps.filter(a => a.status === STATUS.REJECTED).length,
-      totalApprovedLoans: allApps.filter(a => a.status === STATUS.APPROVED).length,
+      pendingEscalated: allApps.filter((a: AppRecord) => a.status === STATUS.ESCALATED).length,
+      approvedCases: allApps.filter((a: AppRecord) => a.status === STATUS.APPROVED).length,
+      rejectedCases: allApps.filter((a: AppRecord) => a.status === STATUS.REJECTED).length,
+      totalApprovedLoans: allApps.filter((a: AppRecord) => a.status === STATUS.APPROVED).length,
     });
   } else {
     res.status(400).json({ message: 'Unknown role' });
@@ -128,13 +161,13 @@ export async function getApplicationById(req: AuthRequest, res: Response) {
 
 export async function createApplication(req: AuthRequest, res: Response) {
   const userId = req.user!.id;
-  const data = req.body;
+  const safeData = sanitizeAppData(req.body);
 
   const app = await prisma.application.create({
     data: {
       userId,
       status: STATUS.DRAFT,
-      ...data,
+      ...safeData,
     },
   });
 
@@ -152,7 +185,7 @@ export async function createApplication(req: AuthRequest, res: Response) {
 
 export async function updateApplication(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  const data = req.body;
+  const data = sanitizeAppData(req.body);
   const app = await prisma.application.findUnique({ where: { id } });
   if (!app) {
     apiLogger.warn(`Application not found for update: ${id}`, {
@@ -169,9 +202,6 @@ export async function updateApplication(req: AuthRequest, res: Response) {
     return res.status(400).json({ message: 'Only draft applications can be edited' });
   }
 
-  if (data.monthlyIncome !== undefined) data.monthlyIncome = parseFloat(data.monthlyIncome) || 0;
-  if (data.loanAmount !== undefined) data.loanAmount = parseFloat(data.loanAmount) || 0;
-
   const updated = await prisma.application.update({ where: { id }, data });
   apiLogger.info(`Application ${id} updated`, {
     file: 'src/controllers/applicationController.ts',
@@ -182,14 +212,21 @@ export async function updateApplication(req: AuthRequest, res: Response) {
 
 export async function handleSubmit(req: AuthRequest, res: Response) {
   const { id } = req.params;
-  const data = req.body;
+  const data = sanitizeAppData(req.body);
 
-  if (data.monthlyIncome !== undefined) data.monthlyIncome = parseFloat(data.monthlyIncome) || 0;
-  if (data.loanAmount !== undefined) data.loanAmount = parseFloat(data.loanAmount) || 0;
-
-  const updated = await prisma.application.update({ where: { id }, data });
+  // Validate first - reject immediately if invalid
   const validation = validateApplication(data);
+  if (!validation.valid) {
+    apiLogger.warn(`Application ${id} submit rejected: validation failed`, {
+      file: 'src/controllers/applicationController.ts',
+      function: 'handleSubmit', userId: req.user!.id, requestId: req.requestId,
+      errors: validation.errors,
+    });
+    return res.status(400).json({ message: 'Validation failed', errors: validation.errors, validation });
+  }
 
+  // Only save data and submit if validation passes
+  await prisma.application.update({ where: { id }, data });
   const finalApp = await submitApplication(id);
 
   await addHistory({ applicationId: id, status: STATUS.SUBMITTED, action: 'SUBMITTED', performedBy: req.user!.username, performedByRole: 'APPLICANT' });
