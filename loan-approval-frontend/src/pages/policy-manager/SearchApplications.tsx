@@ -7,7 +7,8 @@ import { TableSkeleton } from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
 import { useDebounce } from '../../hooks/useDebounce';
 import type { Application } from '../../types';
-import { logger, apiLogger } from '../../utils/logger';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
+import toast from 'react-hot-toast';
 
 export default function PolicySearch() {
   const [apps, setApps] = useState<Application[]>([]);
@@ -22,14 +23,24 @@ export default function PolicySearch() {
     logger.info('PolicySearch page mounted', { file: 'src/pages/policy-manager/SearchApplications.tsx', function: 'PolicySearch' });
   }, []);
 
+  useEffect(() => { if (page !== 1) setPage(1) }, [debouncedSearch, statusFilter]);
+
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
-    api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 } })
+    api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 }, signal: controller.signal })
       .then((r) => {
         apiLogger.info(`Policy search results: ${r.data.data.length} apps (page ${page})`, { file: 'src/pages/policy-manager/SearchApplications.tsx' });
         setApps(r.data.data); setTotalPages(r.data.pagination.totalPages || 1);
       })
+      .catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          errorLogger.error('Policy search failed', { file: 'src/pages/policy-manager/SearchApplications.tsx', message: err.message });
+          toast.error('Failed to load applications');
+        }
+      })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [debouncedSearch, statusFilter, page]);
 
   return (

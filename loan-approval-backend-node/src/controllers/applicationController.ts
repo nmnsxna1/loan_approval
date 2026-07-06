@@ -1,12 +1,10 @@
 import { Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth';
 import { STATUS } from '../config/auth';
-import { backendLogger, apiLogger, dbLogger } from '../utils/logger';
+import { backendLogger, apiLogger } from '../utils/logger';
 import { validateApplication } from '../services/validationEngine';
 import { submitApplication, approveApplication, rejectApplication, escalateApplication, addHistory, createAuditLog } from '../services/workflowService';
-
-const prisma = new PrismaClient();
 
 export async function getDashboard(req: AuthRequest, res: Response) {
   const userId = req.user!.id;
@@ -16,7 +14,7 @@ export async function getDashboard(req: AuthRequest, res: Response) {
     file: 'src/controllers/applicationController.ts',
     function: 'getDashboard',
     userId,
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
 
   if (role === 'APPLICANT') {
@@ -89,7 +87,7 @@ export async function getApplications(req: AuthRequest, res: Response) {
     file: 'src/controllers/applicationController.ts',
     function: 'getApplications',
     userId,
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
 
   res.json({
@@ -115,7 +113,7 @@ export async function getApplicationById(req: AuthRequest, res: Response) {
       file: 'src/controllers/applicationController.ts',
       function: 'getApplicationById',
       userId: req.user!.id,
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
     return res.status(404).json({ message: 'Application not found' });
   }
@@ -123,7 +121,7 @@ export async function getApplicationById(req: AuthRequest, res: Response) {
     file: 'src/controllers/applicationController.ts',
     function: 'getApplicationById',
     userId: req.user!.id,
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
   res.json(app);
 }
@@ -146,7 +144,7 @@ export async function createApplication(req: AuthRequest, res: Response) {
     file: 'src/controllers/applicationController.ts',
     function: 'createApplication',
     userId,
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
 
   res.status(201).json(app);
@@ -159,14 +157,14 @@ export async function updateApplication(req: AuthRequest, res: Response) {
   if (!app) {
     apiLogger.warn(`Application not found for update: ${id}`, {
       file: 'src/controllers/applicationController.ts',
-      function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+      function: 'updateApplication', userId: req.user!.id, requestId: req.requestId,
     });
     return res.status(404).json({ message: 'Application not found' });
   }
   if (app.status !== STATUS.DRAFT) {
     apiLogger.warn(`Cannot update non-draft application: ${id}`, {
       file: 'src/controllers/applicationController.ts',
-      function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+      function: 'updateApplication', userId: req.user!.id, requestId: req.requestId,
     });
     return res.status(400).json({ message: 'Only draft applications can be edited' });
   }
@@ -177,7 +175,7 @@ export async function updateApplication(req: AuthRequest, res: Response) {
   const updated = await prisma.application.update({ where: { id }, data });
   apiLogger.info(`Application ${id} updated`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'updateApplication', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'updateApplication', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(updated);
 }
@@ -189,7 +187,7 @@ export async function handleSubmit(req: AuthRequest, res: Response) {
   if (data.monthlyIncome !== undefined) data.monthlyIncome = parseFloat(data.monthlyIncome) || 0;
   if (data.loanAmount !== undefined) data.loanAmount = parseFloat(data.loanAmount) || 0;
 
-  const updated = await prisma.application.update({ where: { id }, data: { ...data } });
+  const updated = await prisma.application.update({ where: { id }, data });
   const validation = validateApplication(data);
 
   const finalApp = await submitApplication(id);
@@ -199,7 +197,7 @@ export async function handleSubmit(req: AuthRequest, res: Response) {
 
   apiLogger.info(`Application ${id} submitted`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleSubmit', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleSubmit', userId: req.user!.id, requestId: req.requestId,
   });
 
   res.json({ application: finalApp, validation });
@@ -211,7 +209,7 @@ export async function handleApprove(req: AuthRequest, res: Response) {
   await createAuditLog({ applicationId: id, action: 'APPROVED', performedBy: req.user!.username, performedByRole: req.user!.role });
   apiLogger.info(`Application ${id} approved by ${req.user!.username}`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleApprove', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleApprove', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(updated);
 }
@@ -223,7 +221,7 @@ export async function handleReject(req: AuthRequest, res: Response) {
   await createAuditLog({ applicationId: id, action: 'REJECTED', performedBy: req.user!.username, performedByRole: req.user!.role });
   apiLogger.info(`Application ${id} rejected by ${req.user!.username}`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleReject', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleReject', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(updated);
 }
@@ -235,7 +233,7 @@ export async function handleEscalate(req: AuthRequest, res: Response) {
   await createAuditLog({ applicationId: id, action: 'ESCALATED', performedBy: req.user!.username, performedByRole: req.user!.role });
   apiLogger.info(`Application ${id} escalated by ${req.user!.username}`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleEscalate', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleEscalate', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(updated);
 }
@@ -257,7 +255,7 @@ export async function getAuditLogs(req: AuthRequest, res: Response) {
   });
   apiLogger.info(`Audit logs retrieved (${logs.length} entries)`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'getAuditLogs', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'getAuditLogs', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(logs);
 }
@@ -279,7 +277,7 @@ export async function handleDelete(req: AuthRequest, res: Response) {
 
   apiLogger.info(`Application ${id} deleted`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleDelete', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleDelete', userId: req.user!.id, requestId: req.requestId,
   });
   res.json({ message: 'Application deleted' });
 }
@@ -300,7 +298,7 @@ export async function handleWithdraw(req: AuthRequest, res: Response) {
 
   apiLogger.info(`Application ${id} withdrawn`, {
     file: 'src/controllers/applicationController.ts',
-    function: 'handleWithdraw', userId: req.user!.id, requestId: (req as any).requestId,
+    function: 'handleWithdraw', userId: req.user!.id, requestId: req.requestId,
   });
   res.json(updated);
 }

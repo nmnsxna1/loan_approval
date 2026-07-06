@@ -28,15 +28,20 @@ export default function MyApplications() {
     logger.info('MyApplications page mounted', { file: 'src/pages/applicant/MyApplications.tsx', function: 'MyApplications' });
   }, []);
 
-  const fetchApps = () => {
+  const fetchApps = (signal?: AbortSignal) => {
     setLoading(true);
-    api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 } })
+    api.get('/applications', { params: { search: debouncedSearch, status: statusFilter, page, limit: 10 }, signal })
       .then((r) => {
         const total = r.data.pagination.totalPages || 1;
         apiLogger.info(`Applications fetched: page ${page}/${total}`, { file: 'src/pages/applicant/MyApplications.tsx', function: 'fetchApps' });
         setApps(r.data.data); setTotalPages(total);
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          errorLogger.error('Failed to fetch applications', { file: 'src/pages/applicant/MyApplications.tsx', function: 'fetchApps', message: err.message });
+          toast.error('Failed to load applications');
+        }
+      })
       .finally(() => setLoading(false));
   };
 
@@ -68,7 +73,12 @@ export default function MyApplications() {
     setConfirm(null);
   };
 
-  useEffect(() => { fetchApps() }, [debouncedSearch, statusFilter, page]);
+  useEffect(() => { if (page !== 1) setPage(1) }, [debouncedSearch, statusFilter]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchApps(controller.signal);
+    return () => controller.abort();
+  }, [debouncedSearch, statusFilter, page]);
 
   return (
     <div className="space-y-6">

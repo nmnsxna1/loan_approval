@@ -45,7 +45,7 @@ public class WorkflowService {
         if (valid) {
             app.setStatus(LoanStatus.POLICY_REVIEW);
         } else {
-            app.setStatus(LoanStatus.POLICY_REVIEW);
+            app.setStatus(LoanStatus.REJECTED);
         }
 
         LoanApplication saved = applicationRepository.save(app);

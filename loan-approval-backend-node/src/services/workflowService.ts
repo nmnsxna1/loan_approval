@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma';
 import { STATUS } from '../config/auth';
-import { backendLogger, dbLogger } from '../utils/logger';
-
-const prisma = new PrismaClient();
+import { dbLogger } from '../utils/logger';
 
 export async function createAuditLog(params: {
   userId?: string;

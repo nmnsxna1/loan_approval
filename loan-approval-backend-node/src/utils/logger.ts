@@ -82,7 +82,9 @@ function writeToFile(logType: string, content: string, sync: boolean = false): v
   if (sync) {
     fs.appendFileSync(filePath, content, 'utf-8');
   } else {
-    fs.appendFile(filePath, content, 'utf-8', () => {});
+    fs.appendFile(filePath, content, 'utf-8', (err) => {
+      if (err) console.error(`Log write failed [${logType}]:`, err);
+    });
   }
 }
 

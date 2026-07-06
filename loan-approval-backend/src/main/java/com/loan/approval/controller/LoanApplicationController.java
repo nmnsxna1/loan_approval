@@ -2,6 +2,7 @@ package com.loan.approval.controller;
 
 import com.loan.approval.dto.enums.LoanStatus;
 import com.loan.approval.dto.response.ApplicationResponse;
+import com.loan.approval.entity.Role;
 import com.loan.approval.dto.response.AuditLogResponse;
 import com.loan.approval.dto.response.TimelineResponse;
 import com.loan.approval.entity.AuditLog;
@@ -71,13 +72,19 @@ public class LoanApplicationController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApplicationResponse> getApplication(@PathVariable Long id) {
+    public ResponseEntity<ApplicationResponse> getApplication(@PathVariable Long id, Authentication auth) {
         log.info("Fetching application by id: {}", id);
         LoanApplication app = applicationRepository.findById(id)
                 .orElseThrow(() -> {
                     log.warn("Application not found: {}", id);
                     return new RuntimeException("Application not found");
                 });
+        User user = (User) userDetailsService.loadUserByUsername(auth.getName());
+        if (user.getRole() == Role.APPLICANT && !app.getUser().getId().equals(user.getId())) {
+            log.warn("Access denied: user {} attempted to view application {} owned by {}",
+                    user.getId(), id, app.getUser().getId());
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
+        }
         return ResponseEntity.ok(toResponse(app));
     }
 

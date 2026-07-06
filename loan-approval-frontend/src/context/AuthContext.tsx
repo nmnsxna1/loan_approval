@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useCallback, useMemo, ReactNode } 
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import type { Role } from '../types';
-import { authLogger, errorLogger } from '../utils/logger';
+import { authLogger } from '../utils/logger';
 
 interface UserData { username: string; email: string; role: Role }
 
@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         file: 'src/context/AuthContext.tsx', function: 'AuthProvider',
       });
     }
-    return stored ? JSON.parse(stored) : null;
+    try { return stored ? JSON.parse(stored) : null; } catch { localStorage.removeItem('user'); return null; }
   });
   const navigate = useNavigate();
 

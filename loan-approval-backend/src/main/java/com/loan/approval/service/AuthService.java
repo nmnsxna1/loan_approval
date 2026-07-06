@@ -3,6 +3,7 @@ package com.loan.approval.service;
 import com.loan.approval.dto.LoginRequest;
 import com.loan.approval.dto.LoginResponse;
 import com.loan.approval.dto.RegisterRequest;
+import com.loan.approval.entity.Role;
 import com.loan.approval.entity.User;
 import com.loan.approval.repository.UserRepository;
 import com.loan.approval.security.JwtTokenProvider;
@@ -61,7 +62,7 @@ public class AuthService {
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .email(request.getEmail())
-                .role(request.getRole())
+                .role(Role.APPLICANT)
                 .enabled(true)
                 .build();
 

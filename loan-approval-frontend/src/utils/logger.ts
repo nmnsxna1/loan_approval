@@ -103,7 +103,9 @@ class Logger {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('Log POST failed:', err);
+      });
     }
   }
 

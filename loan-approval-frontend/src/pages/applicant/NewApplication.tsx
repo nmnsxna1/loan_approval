@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import { Upload, Save, Send, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { logger, apiLogger, errorLogger } from '../../utils/logger';
+import { getUploadUrl } from '../../utils/uploadUrl';
 
 interface FormData {
   applicantName: string; dob: string; gender: string; pan: string; aadhaar: string;
@@ -34,32 +35,35 @@ export default function NewApplication() {
   }, []);
 
   useEffect(() => {
-    if (editId) {
-      logger.info(`Loading existing application: ${editId}`, { file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication' });
-      api.get(`/applications/${editId}`).then((r) => {
-        const d = r.data;
-        setForm({
-          applicantName: d.applicantName || '', dob: d.dob || '', gender: d.gender || '',
-          pan: d.pan || '', aadhaar: d.aadhaar || '', phone: d.phone || '',
-          email: d.email || '', address: d.address || '', occupation: d.occupation || '',
-          employer: d.employer || '', monthlyIncome: d.monthlyIncome?.toString() || '',
-          loanAmount: d.loanAmount?.toString() || '', loanPurpose: d.loanPurpose || '',
-          bankDetails: d.bankDetails || '',
-        });
-        const extracted: Record<string, { value: string; confidence: number }> = {};
-        d.extractedFields?.forEach((ef: any) => {
-          extracted[ef.fieldName] = { value: ef.fieldValue || '', confidence: ef.confidence || 1 };
-        });
-        setExtractedFields(extracted);
-        if (d.pdfPath) setPdfUrl(`http://localhost:8080/uploads/${d.pdfPath.split('\\').pop() || d.pdfPath.split('/').pop()}`);
-      }).catch((err) => {
+    if (!editId) return;
+    const controller = new AbortController();
+    logger.info(`Loading existing application: ${editId}`, { file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication' });
+    api.get(`/applications/${editId}`, { signal: controller.signal }).then((r) => {
+      const d = r.data;
+      setForm({
+        applicantName: d.applicantName || '', dob: d.dob || '', gender: d.gender || '',
+        pan: d.pan || '', aadhaar: d.aadhaar || '', phone: d.phone || '',
+        email: d.email || '', address: d.address || '', occupation: d.occupation || '',
+        employer: d.employer || '', monthlyIncome: d.monthlyIncome?.toString() || '',
+        loanAmount: d.loanAmount?.toString() || '', loanPurpose: d.loanPurpose || '',
+        bankDetails: d.bankDetails || '',
+      });
+      const extracted: Record<string, { value: string; confidence: number }> = {};
+      d.extractedFields?.forEach((ef: any) => {
+        extracted[ef.fieldName] = { value: ef.fieldValue || '', confidence: ef.confidence || 1 };
+      });
+      setExtractedFields(extracted);
+      if (d.pdfPath) setPdfUrl(getUploadUrl(d.pdfPath.split('\\').pop() || d.pdfPath.split('/').pop()));
+    }).catch((err) => {
+      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
         errorLogger.error('Failed to load existing application', {
           file: 'src/pages/applicant/NewApplication.tsx', function: 'NewApplication',
           message: err.message, applicationId: editId,
         });
         toast.error('Failed to load application');
-      });
-    }
+      }
+    });
+    return () => controller.abort();
   }, [editId]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +84,7 @@ export default function NewApplication() {
       const app = await api.get(`/applications/${res.data.applicationId}`);
       if (app.data.pdfPath) {
         const fileName = app.data.pdfPath.split('\\').pop() || app.data.pdfPath.split('/').pop();
-        setPdfUrl(`http://localhost:8080/uploads/${fileName}`);
+        setPdfUrl(getUploadUrl(fileName));
       }
       const extracted: Record<string, { value: string; confidence: number }> = {};
       app.data.extractedFields?.forEach((ef: any) => {
@@ -121,9 +125,9 @@ export default function NewApplication() {
 
   const getFieldBadge = (field: string) => {
     const ef = extractedFields[field];
-    if (!ef || ef.value === '') return <AlertCircle className="w-4 h-4 text-red-500" title="Missing" />;
-    if (ef.confidence < 0.7) return <AlertCircle className="w-4 h-4 text-yellow-500" title="Needs Verification" />;
-    return <CheckCircle className="w-4 h-4 text-green-500" title="Verified" />;
+    if (!ef || ef.value === '') return <span title="Missing"><AlertCircle className="w-4 h-4 text-red-500" /></span>;
+    if (ef.confidence < 0.7) return <span title="Needs Verification"><AlertCircle className="w-4 h-4 text-yellow-500" /></span>;
+    return <span title="Verified"><CheckCircle className="w-4 h-4 text-green-500" /></span>;
   };
 
   const handleSaveDraft = async () => {

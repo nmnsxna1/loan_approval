@@ -3,10 +3,9 @@ import api from '../../api/axios';
 import StatusBadge from '../../components/StatusBadge';
 import { TableSkeleton } from '../../components/LoadingSkeleton';
 import EmptyState from '../../components/EmptyState';
-import ConfirmDialog from '../../components/ConfirmDialog';
 import type { Application } from '../../types';
 import toast from 'react-hot-toast';
-import { CheckCircle, XCircle, ArrowUpRight, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowUpRight, Loader2 } from 'lucide-react';
 import { logger, apiLogger, errorLogger } from '../../utils/logger';
 
 export default function ReviewApplications() {
@@ -18,33 +17,41 @@ export default function ReviewApplications() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     logger.info('ReviewApplications page mounted', { file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'ReviewApplications' });
-    api.get('/applications', { params: { status: 'SUBMITTED', limit: 100 } })
+    api.get('/applications', { params: { status: 'SUBMITTED', limit: 100 }, signal: controller.signal })
       .then((r) => {
         apiLogger.info(`Review apps loaded: ${r.data.data.length} pending`, { file: 'src/pages/policy-manager/ReviewApplications.tsx' });
         setApps(r.data.data);
+      }).catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          errorLogger.error('Failed to load review apps', { file: 'src/pages/policy-manager/ReviewApplications.tsx', message: err.message });
+          toast.error('Failed to load applications');
+        }
       }).finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
-  const handleAction = async () => {
-    if (!selected || !action) return;
-    if ((action === 'reject' || action === 'escalate') && !reason.trim()) {
+  const handleAction = async (directAction?: 'approve' | 'reject' | 'escalate') => {
+    const currentAction = directAction || action;
+    if (!selected || !currentAction) return;
+    if ((currentAction === 'reject' || currentAction === 'escalate') && !reason.trim()) {
       toast.error('Reason is mandatory');
       return;
     }
     setSubmitting(true);
-    apiLogger.info(`Review action: ${action} on application #${selected.applicationNo}`, {
+    apiLogger.info(`Review action: ${currentAction} on application #${selected.applicationNo}`, {
       file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'handleAction',
     });
     try {
-      if (action === 'approve') await api.post(`/applications/${selected.id}/approve`);
-      else if (action === 'reject') await api.post(`/applications/${selected.id}/reject`, { reason });
+      if (currentAction === 'approve') await api.post(`/applications/${selected.id}/approve`);
+      else if (currentAction === 'reject') await api.post(`/applications/${selected.id}/reject`, { reason });
       else await api.post(`/applications/${selected.id}/escalate`, { reason });
-      toast.success(`Application ${action}d successfully`);
+      toast.success(`Application ${currentAction}d successfully`);
       setApps((p) => p.filter((a) => a.id !== selected.id));
       setSelected(null); setAction(null); setReason('');
     } catch (err: any) {
-      errorLogger.error(`Review action failed: ${action}`, {
+      errorLogger.error(`Review action failed: ${currentAction}`, {
         file: 'src/pages/policy-manager/ReviewApplications.tsx', function: 'handleAction',
         message: err.response?.data?.message || err.message,
       });
@@ -162,7 +169,7 @@ export default function ReviewApplications() {
 
               {action === null ? (
                 <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
-                  <button onClick={() => { setAction('approve'); handleAction(); }} className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 inline-flex items-center justify-center gap-2"><CheckCircle className="w-4 h-4" /> Approve</button>
+                  <button onClick={() => handleAction('approve')} className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 inline-flex items-center justify-center gap-2"><CheckCircle className="w-4 h-4" /> Approve</button>
                   <button onClick={() => setAction('reject')} className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 inline-flex items-center justify-center gap-2"><XCircle className="w-4 h-4" /> Reject</button>
                   <button onClick={() => setAction('escalate')} className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 inline-flex items-center justify-center gap-2"><ArrowUpRight className="w-4 h-4" /> Escalate</button>
                 </div>
@@ -174,7 +181,7 @@ export default function ReviewApplications() {
                   <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
                     className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                   <div className="flex gap-2 mt-3">
-                    <button onClick={handleAction} disabled={submitting}
+                    <button onClick={() => handleAction()} disabled={submitting}
                       className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 inline-flex items-center gap-2">
                       {submitting && <Loader2 className="w-4 h-4 animate-spin" />} Confirm
                     </button>

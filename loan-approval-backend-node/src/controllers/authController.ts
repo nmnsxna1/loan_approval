@@ -1,25 +1,24 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../utils/prisma';
+import { AuthRequest } from '../middleware/auth';
 import { generateToken } from '../utils/jwt';
 import { authLogger, apiLogger } from '../utils/logger';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
-export async function login(req: Request, res: Response) {
+export async function login(req: AuthRequest, res: Response) {
   const { username, password } = loginSchema.parse(req.body);
 
   authLogger.info(`Login attempt for user: ${username}`, {
     file: 'src/controllers/authController.ts',
     function: 'login',
     url: '/api/auth/login',
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
 
   const user = await prisma.user.findUnique({ where: { username } });
@@ -27,7 +26,7 @@ export async function login(req: Request, res: Response) {
     authLogger.warn(`Login failed - user not found: ${username}`, {
       file: 'src/controllers/authController.ts',
       function: 'login',
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
     return res.status(401).json({ message: 'Invalid username or password' });
   }
@@ -37,7 +36,7 @@ export async function login(req: Request, res: Response) {
     authLogger.warn(`Login failed - invalid password for: ${username}`, {
       file: 'src/controllers/authController.ts',
       function: 'login',
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
     return res.status(401).json({ message: 'Invalid username or password' });
   }
@@ -48,7 +47,7 @@ export async function login(req: Request, res: Response) {
     file: 'src/controllers/authController.ts',
     function: 'login',
     userId: user.id,
-    requestId: (req as any).requestId,
+    requestId: req.requestId,
   });
 
   res.json({

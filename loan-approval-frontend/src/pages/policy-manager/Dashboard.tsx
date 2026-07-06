@@ -3,18 +3,26 @@ import api from '../../api/axios';
 import { CardSkeleton } from '../../components/LoadingSkeleton';
 import type { PolicyDashboard } from '../../types';
 import { Clock, CheckCircle2, XCircle, AlertTriangle, Eye } from 'lucide-react';
-import { logger, apiLogger } from '../../utils/logger';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
+import toast from 'react-hot-toast';
 
 export default function PolicyManagerDashboard() {
   const [data, setData] = useState<PolicyDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     logger.info('PolicyManagerDashboard mounted', { file: 'src/pages/policy-manager/Dashboard.tsx', function: 'PolicyManagerDashboard' });
-    api.get('/applications/dashboard').then((r) => {
+    api.get('/applications/dashboard', { signal: controller.signal }).then((r) => {
       apiLogger.info('Policy dashboard data loaded', { file: 'src/pages/policy-manager/Dashboard.tsx' });
       setData(r.data);
+    }).catch((err) => {
+      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+        errorLogger.error('Policy dashboard failed', { file: 'src/pages/policy-manager/Dashboard.tsx', message: err.message });
+        toast.error('Failed to load dashboard');
+      }
     }).finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   if (loading) return (

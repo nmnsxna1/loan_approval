@@ -4,6 +4,7 @@ import { authLogger } from '../utils/logger';
 
 export interface AuthRequest extends Request {
   user?: { id: string; username: string; role: string };
+  requestId?: string;
   params: Record<string, string>;
 }
 
@@ -24,7 +25,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     authLogger.info(`User authenticated: ${req.user.username} (${req.user.role})`, {
       file: 'src/middleware/auth.ts',
       function: 'authenticate',
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
       userId: req.user.id,
     });
     next();
@@ -33,7 +34,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
       file: 'src/middleware/auth.ts',
       function: 'authenticate',
       url: req.originalUrl,
-      requestId: (req as any).requestId,
+      requestId: req.requestId,
     });
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
@@ -55,7 +56,7 @@ export function authorize(...roles: string[]) {
         function: 'authorize',
         url: req.originalUrl,
         userId: req.user.id,
-        requestId: (req as any).requestId,
+        requestId: req.requestId,
       });
       return res.status(403).json({ message: 'Insufficient permissions' });
     }

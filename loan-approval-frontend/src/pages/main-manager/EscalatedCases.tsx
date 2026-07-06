@@ -17,12 +17,19 @@ export default function EscalatedCases() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     logger.info('EscalatedCases page mounted', { file: 'src/pages/main-manager/EscalatedCases.tsx', function: 'EscalatedCases' });
-    api.get('/applications', { params: { status: 'ESCALATED', limit: 100 } })
+    api.get('/applications', { params: { status: 'ESCALATED', limit: 100 }, signal: controller.signal })
       .then((r) => {
         apiLogger.info(`Escalated cases loaded: ${r.data.data.length}`, { file: 'src/pages/main-manager/EscalatedCases.tsx' });
         setApps(r.data.data);
+      }).catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          errorLogger.error('Failed to load escalated cases', { file: 'src/pages/main-manager/EscalatedCases.tsx', message: err.message });
+          toast.error('Failed to load escalated cases');
+        }
       }).finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   const handleAction = async () => {

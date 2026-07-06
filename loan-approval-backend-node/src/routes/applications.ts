@@ -21,8 +21,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/dashboard', getDashboard);
-router.get('/', getApplications);
 router.get('/audit-logs', authorize('MAIN_MANAGER'), getAuditLogs);
+router.get('/', getApplications);
 router.get('/:id', getApplicationById);
 router.post('/', authorize('APPLICANT'), createApplication);
 router.put('/:id', authorize('APPLICANT'), updateApplication);

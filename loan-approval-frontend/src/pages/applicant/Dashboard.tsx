@@ -5,18 +5,26 @@ import EmptyState from '../../components/EmptyState';
 import StatusBadge from '../../components/StatusBadge';
 import type { ApplicantDashboard as DashboardData } from '../../types';
 import { FileText, Send, Clock, Calendar } from 'lucide-react';
-import { logger, apiLogger } from '../../utils/logger';
+import { logger, apiLogger, errorLogger } from '../../utils/logger';
+import toast from 'react-hot-toast';
 
 export default function ApplicantDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     logger.info('ApplicantDashboard mounted', { file: 'src/pages/applicant/Dashboard.tsx', function: 'ApplicantDashboard' });
-    api.get('/applications/dashboard').then((r) => {
+    api.get('/applications/dashboard', { signal: controller.signal }).then((r) => {
       apiLogger.info('Applicant dashboard data loaded', { file: 'src/pages/applicant/Dashboard.tsx' });
       setData(r.data);
+    }).catch((err) => {
+      if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+        errorLogger.error('Applicant dashboard failed', { file: 'src/pages/applicant/Dashboard.tsx', message: err.message });
+        toast.error('Failed to load dashboard');
+      }
     }).finally(() => setLoading(false));
+    return () => controller.abort();
   }, []);
 
   if (loading) return (
