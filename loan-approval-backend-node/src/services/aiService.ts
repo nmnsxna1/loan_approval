@@ -1,6 +1,6 @@
 import fs from 'fs';
 import pdfParse from 'pdf-parse';
-import { getLlmConfig } from '../config/llm';
+import { getLlmConfig, LlmConfig, ProviderName } from '../config/llm';
 import { backendLogger, apiLogger, errorLogger, perfLogger } from '../utils/logger';
 
 function extractTextFromSimplePdf(buffer: Buffer): string {
@@ -61,34 +61,24 @@ function extractJsonFromText(text: string): string {
 
 async function callLlm(messages: { role: string; content: string }[]): Promise<string> {
   const config = getLlmConfig();
-  const url = `${config.baseUrl}/v1/chat/completions`;
   const maxRetries = 2;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const maskedUrl = url.replace(/\/\/.*@/, '//***@');
-    apiLogger.info(`Calling LLM (attempt ${attempt}/${maxRetries}) model=${config.model || 'default'}`, {
+    apiLogger.info(`Calling LLM (attempt ${attempt}/${maxRetries}) provider=${config.provider} model=${config.model || 'default'} timeout=${config.timeoutMs}ms`, {
       file: 'src/services/aiService.ts',
       function: 'callLlm',
     });
 
     const startTime = Date.now();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000);
+    const timeoutId = setTimeout(() => controller.abort(), config.timeoutMs);
 
     try {
-      const body = JSON.stringify({
-        model: config.model || undefined,
-        messages,
-        temperature: config.temperature,
-        max_tokens: config.maxTokens === -1 ? undefined : config.maxTokens,
-      });
+      const { url, headers, body } = buildRequest(config, messages);
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
+        headers,
         body,
         signal: controller.signal,
       });
@@ -104,14 +94,12 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
         throw new Error(`LLM API error ${response.status}: ${errText}`);
       }
 
-      const data: any = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
+      const content = parseLlmResponse(config.provider, await response.json());
 
       if (!content || content.trim().length === 0) {
         errorLogger.error(`LLM returned empty content (attempt ${attempt})`, {
           file: 'src/services/aiService.ts',
           function: 'callLlm',
-          extra: JSON.stringify(data).substring(0, 300),
         });
         if (attempt < maxRetries) {
           apiLogger.info('Retrying LLM call in 2s...', { file: 'src/services/aiService.ts', function: 'callLlm' });
@@ -127,12 +115,21 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
       });
       return content;
     } catch (err: any) {
-      errorLogger.error(`callLlm attempt ${attempt} failed`, {
-        file: 'src/services/aiService.ts',
-        function: 'callLlm',
-        message: err.message,
-        stack: err.stack?.substring(0, 500),
-      });
+      if (err.name === 'AbortError') {
+        errorLogger.error(`callLlm timed out after ${config.timeoutMs}ms`, {
+          file: 'src/services/aiService.ts',
+          function: 'callLlm',
+          provider: config.provider,
+          timeoutMs: config.timeoutMs,
+        });
+      } else {
+        errorLogger.error(`callLlm attempt ${attempt} failed`, {
+          file: 'src/services/aiService.ts',
+          function: 'callLlm',
+          message: err.message,
+          stack: err.stack?.substring(0, 500),
+        });
+      }
       if (attempt < maxRetries) {
         apiLogger.info('Retrying LLM call in 2s...', { file: 'src/services/aiService.ts', function: 'callLlm' });
         await new Promise(r => setTimeout(r, 2000));
@@ -145,6 +142,86 @@ async function callLlm(messages: { role: string; content: string }[]): Promise<s
   }
 
   throw new Error('LLM call failed after all retries');
+}
+
+function buildRequest(config: LlmConfig, messages: { role: string; content: string }[]): { url: string; headers: Record<string, string>; body: string } {
+  const { provider, baseUrl, model, apiKey, temperature, maxTokens } = config;
+
+  if (provider === 'anthropic') {
+    const systemMsg = messages.find(m => m.role === 'system');
+    const userMsgs = messages.filter(m => m.role !== 'system');
+    return {
+      url: `${baseUrl}/v1/messages`,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-3-5-sonnet-20241022',
+        max_tokens: maxTokens > 0 ? maxTokens : 4096,
+        system: systemMsg?.content,
+        messages: userMsgs.map(m => ({ role: m.role, content: m.content })),
+      }),
+    };
+  }
+
+  if (provider === 'gemini') {
+    const lastMsg = messages[messages.length - 1]?.content || '';
+    const url = `${baseUrl}/v1beta/models/${model || 'gemini-2.0-flash'}:generateContent?key=${apiKey}`;
+    return {
+      url,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: lastMsg }] }],
+        generationConfig: {
+          temperature,
+          maxOutputTokens: maxTokens > 0 ? maxTokens : 8192,
+        },
+      }),
+    };
+  }
+
+  if (provider === 'ollama') {
+    return {
+      url: `${baseUrl}/api/chat`,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: model || 'llama3',
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        options: { temperature },
+      }),
+    };
+  }
+
+  const openAiUrl = `${baseUrl}/v1/chat/completions`;
+  const maskedUrl = openAiUrl.replace(/\/\/.*@/, '//***@');
+  return {
+    url: openAiUrl,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: model || undefined,
+      messages,
+      temperature,
+      max_tokens: maxTokens === -1 ? undefined : maxTokens,
+    }),
+  };
+}
+
+function parseLlmResponse(provider: ProviderName, data: any): string {
+  if (provider === 'anthropic') {
+    return data?.content?.[0]?.text || '';
+  }
+  if (provider === 'gemini') {
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+  if (provider === 'ollama') {
+    return data?.message?.content || '';
+  }
+  return data?.choices?.[0]?.message?.content || '';
 }
 
 export async function extractFromPdf(filePath: string): Promise<{ extracted: ExtractedData; risk: RiskAnalysis }> {
