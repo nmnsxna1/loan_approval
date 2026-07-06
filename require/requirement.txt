@@ -1,0 +1,629 @@
+Build a modern, production-quality AI Loan Approval Platform using React (Vite), Tailwind CSS, Node.js, Express, PostgreSQL, and Prisma.
+
+The application should have a professional banking/insurance dashboard UI with a collapsible left sidebar, responsive design, cards, tables, modals, loading indicators, notifications, and role-based authentication.
+
+There are only three roles:
+
+1. Applicant
+2. Policy Manager
+3. Main Manager
+
+Use simple username/password authentication for each role.
+
+====================================================
+GENERAL REQUIREMENTS
+====================================================
+
+• Clean professional banking dashboard UI.
+• Left sidebar navigation.
+• Responsive design.
+• Role-based access.
+• Protected routes.
+• PostgreSQL database.
+• Prisma ORM.
+• JWT Authentication.
+• PDF upload.
+• AI document extraction.
+• AI risk analysis.
+• Application workflow.
+• Search functionality.
+• Pagination.
+• Toast notifications.
+• Loading skeletons.
+• Form validation.
+• Draft auto-save.
+• Audit log.
+
+====================================================
+ROLE 1 : APPLICANT
+====================================================
+
+After successful login the applicant should land on the Dashboard.
+
+The sidebar should contain exactly three menu items.
+
+1. Dashboard
+
+2. New Application
+
+3. My Applications
+
+----------------------------------------------------
+Dashboard
+----------------------------------------------------
+
+Display summary cards.
+
+Card 1
+Pending Draft Applications
+
+Card 2
+Successfully Submitted Applications
+
+Card 3
+Total Applications
+
+Card 4
+Last Submitted Date
+
+Display recent activity.
+
+----------------------------------------------------
+New Application
+----------------------------------------------------
+
+This page is used to create a loan application.
+
+Workflow
+
+Step 1
+
+Upload PDF
+
+Accepted formats
+
+PDF only
+
+Examples
+
+Salary Slip
+
+Bank Statement
+
+PAN Card
+
+Aadhaar
+
+Income Proof
+
+Loan Documents
+
+----------------------------------------------------
+
+After upload
+
+AI automatically extracts information from the PDF.
+
+Display the page in two columns.
+
+LEFT SIDE
+
+Embedded PDF Viewer
+
+The uploaded PDF should remain visible while editing.
+
+RIGHT SIDE
+
+Editable extracted information form.
+
+Fields should include
+
+Applicant Name
+
+DOB
+
+Gender
+
+PAN
+
+Aadhaar
+
+Phone
+
+Email
+
+Address
+
+Occupation
+
+Employer
+
+Monthly Income
+
+Loan Amount Requested
+
+Loan Purpose
+
+Bank Details
+
+All fields extracted by AI should be editable.
+
+If AI confidence is low
+
+Highlight the field.
+
+Show
+
+"Needs Verification"
+
+with yellow border.
+
+Missing fields should be highlighted in red.
+
+----------------------------------------------------
+
+Bottom Buttons
+
+Save Draft
+
+Submit Application
+
+----------------------------------------------------
+
+Save Draft
+
+Stores application without sending to Policy Manager.
+
+Status
+
+Draft
+
+----------------------------------------------------
+
+Submit
+
+Validate all mandatory fields.
+
+Store application.
+
+Status becomes
+
+Submitted
+
+Application moves automatically to Policy Manager queue.
+
+Show success notification.
+
+====================================================
+My Applications
+====================================================
+
+Display all applications.
+
+Columns
+
+Application Number
+
+Applicant Name
+
+Created Date
+
+Submitted Date
+
+Status
+
+Possible status
+
+Draft
+
+Submitted
+
+Under Review
+
+Approved
+
+Rejected
+
+Escalated
+
+Add search.
+
+Add filters.
+
+Allow opening an application.
+
+If Draft
+
+Allow Edit.
+
+If Submitted
+
+Read-only.
+
+====================================================
+ROLE 2 : POLICY MANAGER
+====================================================
+
+Sidebar
+
+1 Dashboard
+
+2 Review Applications
+
+3 Search Applications
+
+----------------------------------------------------
+Dashboard
+----------------------------------------------------
+
+Display cards
+
+Pending Applications
+
+Applications Reviewed Today
+
+Escalated Cases
+
+Approved Cases
+
+Rejected Cases
+
+----------------------------------------------------
+Review Applications
+----------------------------------------------------
+
+Show applications submitted by applicants.
+
+Table columns
+
+Application Number
+
+Applicant
+
+Submission Date
+
+Risk Score
+
+Status
+
+Action
+
+Clicking an application opens Review Screen.
+
+----------------------------------------------------
+Review Screen
+----------------------------------------------------
+
+Split screen layout.
+
+LEFT
+
+PDF Viewer
+
+RIGHT
+
+Single AI Analysis Card
+
+The card should contain
+
+Applicant Information
+
+Extracted Data
+
+AI Summary
+
+Risk Score
+
+Fraud Detection
+
+Missing Documents
+
+Income Verification
+
+Employment Verification
+
+Credit Assessment
+
+Confidence Score
+
+Recommended Decision
+
+Reasons
+
+Everything should appear inside one professional card.
+
+----------------------------------------------------
+
+Bottom Actions
+
+Approve
+
+Reject
+
+Escalate to Main Manager
+
+----------------------------------------------------
+
+Reject
+
+Reason is mandatory.
+
+----------------------------------------------------
+
+Escalate
+
+Reason is mandatory.
+
+Application status
+
+Escalated
+
+Visible to Main Manager.
+
+====================================================
+Search Applications
+====================================================
+
+Search using
+
+Application Number
+
+Applicant Name
+
+Status
+
+Date
+
+Display results in a table.
+
+====================================================
+ROLE 3 : MAIN MANAGER
+====================================================
+
+Sidebar
+
+1 Dashboard
+
+2 Escalated Cases
+
+3 Search Applications
+
+----------------------------------------------------
+Dashboard
+----------------------------------------------------
+
+Cards
+
+Pending Escalated Cases
+
+Approved Cases
+
+Rejected Cases
+
+Total Company Approved Loans
+
+----------------------------------------------------
+Escalated Cases
+----------------------------------------------------
+
+Show only escalated applications.
+
+Clicking an application opens the review page.
+
+Layout same as Policy Manager.
+
+LEFT
+
+PDF Viewer
+
+RIGHT
+
+Complete AI Analysis Card
+
+Display
+
+Applicant Details
+
+Risk Analysis
+
+Fraud Detection
+
+Income Validation
+
+Manager Notes
+
+Policy Manager Comments
+
+Escalation Reason
+
+AI Recommendation
+
+----------------------------------------------------
+
+Actions
+
+Approve
+
+Reject
+
+Reason mandatory.
+
+Final decision updates application status.
+
+====================================================
+Search Applications
+====================================================
+
+Search by
+
+Application Number
+
+Applicant Name
+
+Status
+
+Date
+
+====================================================
+AI FEATURES
+====================================================
+
+When applicant uploads a PDF
+
+AI extracts
+
+Name
+
+DOB
+
+Address
+
+PAN
+
+Aadhaar
+
+Phone
+
+Email
+
+Income
+
+Employer
+
+Loan Amount
+
+Loan Purpose
+
+AI calculates
+
+Risk Score
+
+Fraud Probability
+
+Missing Documents
+
+Document Quality
+
+Confidence Score
+
+Policy Recommendation
+
+Approval Probability
+
+Generate a concise AI summary.
+
+====================================================
+APPLICATION STATUS FLOW
+====================================================
+
+Draft
+
+↓
+
+Submitted
+
+↓
+
+Under Review
+
+↓
+
+Approved
+
+OR
+
+Rejected
+
+OR
+
+Escalated
+
+↓
+
+Main Manager
+
+↓
+
+Approved
+
+OR
+
+Rejected
+
+====================================================
+DATABASE
+====================================================
+
+Create proper PostgreSQL schema using Prisma.
+
+Tables
+
+Users
+
+Applications
+
+Documents
+
+ExtractedFields
+
+RiskAssessment
+
+ApplicationHistory
+
+AuditLogs
+
+====================================================
+UI REQUIREMENTS
+====================================================
+
+Use modern dashboard design.
+
+Tailwind CSS.
+
+Professional banking theme.
+
+Rounded cards.
+
+Soft shadows.
+
+Lucide icons.
+
+Responsive layout.
+
+Professional tables.
+
+Status badges.
+
+Progress indicators.
+
+Empty states.
+
+Loading skeletons.
+
+Error handling.
+
+Confirmation dialogs.
+
+Dark mode support.
+
+====================================================
+CODE REQUIREMENTS
+====================================================
+
+Use TypeScript.
+
+Use reusable React components.
+
+Separate frontend and backend.
+
+Follow clean architecture.
+
+Use Prisma migrations.
+
+Implement REST APIs.
+
+Use JWT authentication.
+
+Keep code modular, scalable, and production-ready.
+
+Generate complete frontend, backend, database schema, API routes, and folder structure with clean, maintainable code.

@@ -1,0 +1,41 @@
+%PDF-1.4
+%ÿÿÿÿ
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+2 0 obj
+<< /Length 189 >>
+stream
+BT /F1 12 Tf 30 750 Td (LOAN APPLICATION FORM
+Name: Rahul Sharma
+Age: 32
+Salary: 85000
+PAN: ABCDE1234F
+Email: rahul@email.com
+Address: 42, MG Road, Bangalore
+Occupation: Software Engineer
+Loan Amount: 2500000) Tj ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Contents 2 0 R /Resources << /Font << /F1 1 0 R >> >> >>
+endobj
+4 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000019 00000 n 
+0000000086 00000 n 
+0000000352 00000 n 
+0000000478 00000 n 
+0000000535 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+585
+%%EOF

@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  email     String   @unique
+  role      String   @default("APPLICANT")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  applications       Application[]      @relation("UserApplications")
+  reviewedByPolicy   Application[]      @relation("PolicyManager")
+  reviewedByMain     Application[]      @relation("MainManager")
+  applicationHistory ApplicationHistory[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model Application {
+  id            String   @id @default(uuid())
+  applicationNo Int      @unique @default(autoincrement())
+  userId        String   @map("user_id")
+  status        String   @default("DRAFT")
+  pdfPath       String?  @map("pdf_path")
+  pdfName       String?  @map("pdf_name")
+  pdfSize       Int?     @map("pdf_size")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  submittedAt   DateTime? @map("submitted_at")
+
+  applicantName   String?  @map("applicant_name")
+  dob             String?  @map("dob")
+  gender          String?
+  pan             String?
+  aadhaar         String?
+  phone           String?
+  email           String?
+  address         String?
+  occupation      String?
+  employer        String?
+  monthlyIncome   Float?   @map("monthly_income")
+  loanAmount      Float?   @map("loan_amount")
+  loanPurpose     String?  @map("loan_purpose")
+  bankDetails     String?  @map("bank_details")
+  escalationReason String? @map("escalation_reason")
+  rejectReason    String?  @map("reject_reason")
+
+  policyManagerId String? @map("policy_manager_id")
+  policyDecidedAt DateTime? @map("policy_decided_at")
+  mainManagerId   String? @map("main_manager_id")
+  mainDecidedAt   DateTime? @map("main_decided_at")
+
+  user  User  @relation("UserApplications", fields: [userId], references: [id])
+  policyManager User? @relation("PolicyManager", fields: [policyManagerId], references: [id])
+  mainManager   User? @relation("MainManager", fields: [mainManagerId], references: [id])
+
+  documents         Document[]
+  extractedFields   ExtractedField[]
+  riskAssessment    RiskAssessment?
+  applicationHistory ApplicationHistory[]
+  auditLogs          AuditLog[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([applicationNo])
+  @@map("applications")
+}
+
+model Document {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  filePath      String   @map("file_path")
+  fileName      String   @map("file_name")
+  fileSize      Int      @map("file_size")
+  documentType  String?  @map("document_type")
+  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("documents")
+}
+
+model ExtractedField {
+  id              String @id @default(uuid())
+  applicationId   String @map("application_id")
+  fieldName       String @map("field_name")
+  fieldValue      String? @map("field_value")
+  confidence      Float  @default(1.0)
+  needsVerification Boolean @default(false) @map("needs_verification")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("extracted_fields")
+}
+
+model RiskAssessment {
+  id                  String  @id @default(uuid())
+  applicationId       String  @unique @map("application_id")
+  riskScore           Int     @default(0) @map("risk_score")
+  fraudProbability    Float   @default(0) @map("fraud_probability")
+  missingDocuments    String? @map("missing_documents")
+  documentQuality     String? @map("document_quality")
+  confidenceScore     Float   @default(0) @map("confidence_score")
+  policyRecommendation String? @map("policy_recommendation")
+  approvalProbability Float   @default(0) @map("approval_probability")
+  aiSummary           String? @map("ai_summary")
+  incomeVerified      Boolean @default(false) @map("income_verified")
+  employmentVerified  Boolean @default(false) @map("employment_verified")
+  creditAssessment    String? @map("credit_assessment")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("risk_assessments")
+}
+
+model ApplicationHistory {
+  id              String   @id @default(uuid())
+  applicationId   String   @map("application_id")
+  status          String
+  action          String
+  performedBy     String   @map("performed_by")
+  performedByRole String   @map("performed_by_role")
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [performedBy], references: [username])
+
+  @@index([applicationId])
+  @@map("application_history")
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  userId          String?  @map("user_id")
+  applicationId   String?  @map("application_id")
+  action          String
+  details         String?
+  performedBy     String?  @map("performed_by")
+  performedByRole String?  @map("performed_by_role")
+  ipAddress       String?  @map("ip_address")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user        User?        @relation(fields: [userId], references: [id])
+  application Application? @relation(fields: [applicationId], references: [id])
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
