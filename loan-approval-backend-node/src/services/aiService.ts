@@ -1,5 +1,4 @@
 import fs from 'fs';
-import pdfParse from 'pdf-parse';
 import { getLlmConfig } from '../config/llm';
 import { info, error as logError } from '../utils/logger';
 
@@ -62,67 +61,51 @@ function extractJsonFromText(text: string): string {
 async function callLlm(messages: { role: string; content: string }[]): Promise<string> {
   const config = getLlmConfig();
   const url = `${config.baseUrl}/v1/chat/completions`;
-  const maxRetries = 2;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    info(`Calling LLM (attempt ${attempt}/${maxRetries}) at ${url} model=${config.model || 'default'}`);
+  info(`Calling LLM at ${url} model=${config.model || 'default'}`);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 180000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 180000);
 
-    try {
-      const body = JSON.stringify({
-        model: config.model || undefined,
-        messages,
-        temperature: config.temperature,
-        max_tokens: config.maxTokens === -1 ? undefined : config.maxTokens,
-      });
+  try {
+    const body = JSON.stringify({
+      model: config.model || undefined,
+      messages,
+      temperature: config.temperature,
+      max_tokens: config.maxTokens === -1 ? undefined : config.maxTokens,
+    });
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
-        body,
-        signal: controller.signal,
-      });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body,
+      signal: controller.signal,
+    });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`LLM API error ${response.status}: ${errText}`);
-      }
-
-      const data: any = await response.json();
-      const content = data?.choices?.[0]?.message?.content;
-
-      if (!content || content.trim().length === 0) {
-        logError(`LLM returned empty content (attempt ${attempt})`, JSON.stringify(data).substring(0, 300));
-        if (attempt < maxRetries) {
-          info('Retrying in 2s...');
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
-        }
-        throw new Error('LLM returned empty content after retries');
-      }
-
-      info(`LLM responded (${content.length} chars)`);
-      return content;
-    } catch (err: any) {
-      logError(`callLlm attempt ${attempt} failed`, err.message);
-      if (err.stack) logError('callLlm stack', err.stack.substring(0, 500));
-      if (attempt < maxRetries) {
-        info('Retrying in 2s...');
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`LLM API error ${response.status}: ${errText}`);
     }
-  }
 
-  throw new Error('LLM call failed after all retries');
+    const data: any = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (!content || content.trim().length === 0) {
+      throw new Error('LLM returned empty content');
+    }
+
+    info(`LLM responded (${content.length} chars)`);
+    return content;
+  } catch (err: any) {
+    logError('callLlm failed', err.message);
+    if (err.stack) logError('callLlm stack', err.stack.substring(0, 500));
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function extractFromPdf(filePath: string): Promise<{ extracted: ExtractedData; risk: RiskAnalysis }> {
@@ -130,100 +113,77 @@ export async function extractFromPdf(filePath: string): Promise<{ extracted: Ext
     info('Reading PDF file...');
     const fileBuffer = fs.readFileSync(filePath);
 
-    let pdfText = '';
-    try {
-      const pdfData = await pdfParse(fileBuffer);
-      pdfText = pdfData.text.trim();
-      info(`PDF extracted via pdf-parse: ${pdfText.length} chars`);
-    } catch (parseErr: any) {
-      logError('pdf-parse failed, trying simple text extractor', parseErr.message);
-      pdfText = extractTextFromSimplePdf(fileBuffer);
-      if (pdfText.length > 10) {
-        info(`PDF extracted via simple extractor: ${pdfText.length} chars`);
-      } else {
-        logError('simple extractor also failed, using raw fallback');
-        pdfText = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r]/g, ' ').substring(0, 3000);
-      }
+    let pdfText = extractTextFromSimplePdf(fileBuffer);
+    if (pdfText.length > 10) {
+      info(`PDF extracted via simple extractor: ${pdfText.length} chars`);
+    } else {
+      pdfText = fileBuffer.toString('utf-8').replace(/[^\x20-\x7E\n\r]/g, ' ').substring(0, 3000);
+      info(`PDF extracted via raw fallback: ${pdfText.length} chars`);
     }
 
     if (!pdfText || pdfText.length < 10) {
       throw new Error('Extracted PDF text is too short or empty');
     }
 
-    const extractionPrompt = `You are a loan application data extractor. Extract the following information from this loan application text. Return ONLY valid JSON with these exact fields:
+    const combinedPrompt = `You are a loan data extraction and risk analysis system. Based on the loan application text below, return ONLY valid JSON with this exact structure:
+
 {
-  "applicantName": "full name",
-  "dob": "date of birth in DD/MM/YYYY",
-  "gender": "Male/Female/Other",
-  "pan": "PAN number",
-  "aadhaar": "Aadhaar number if visible",
-  "phone": "phone number",
-  "email": "email address",
-  "address": "full address",
-  "occupation": "job title",
-  "employer": "employer name",
-  "monthlyIncome": numeric monthly income,
-  "loanAmount": numeric loan amount requested,
-  "loanPurpose": "purpose of loan",
-  "bankDetails": "bank account details if visible"
+  "extracted": {
+    "applicantName": "full name",
+    "dob": "date of birth in DD/MM/YYYY",
+    "gender": "Male/Female/Other",
+    "pan": "PAN number",
+    "aadhaar": "Aadhaar number if visible",
+    "phone": "phone number",
+    "email": "email address",
+    "address": "full address",
+    "occupation": "job title",
+    "employer": "employer name",
+    "monthlyIncome": numeric monthly income,
+    "loanAmount": numeric loan amount requested,
+    "loanPurpose": "purpose of loan",
+    "bankDetails": "bank account details if visible",
+    "confidence": { "applicantName": 0.95, "pan": 0.8 }
+  },
+  "risk": {
+    "riskScore": numeric 0-100,
+    "fraudProbability": numeric 0-1,
+    "missingDocuments": ["list", "of", "missing", "documents"],
+    "documentQuality": "Good/Average/Poor",
+    "confidenceScore": numeric 0-1,
+    "policyRecommendation": "Approve/Review/Reject",
+    "approvalProbability": numeric 0-1,
+    "aiSummary": "2-3 sentence professional summary",
+    "incomeVerified": boolean,
+    "employmentVerified": boolean,
+    "creditAssessment": "Positive/Negative/Insufficient data"
+  }
 }
 
-For each field, also include a confidence score 0-1 in a nested "confidence" object like:
-"confidence": { "applicantName": 0.95, "pan": 0.8, ... }
-
-Fields that are unclear or have low confidence (< 0.7) should be flagged.
+Fields not found in the text should be null with confidence 0. Fields that are unclear or have low confidence (< 0.7) should be flagged.
 
 Loan application text:
 ${pdfText}`;
 
-    const riskPrompt = `You are a loan risk analyst. Based on this loan application, perform a complete risk analysis. Return ONLY valid JSON with these exact fields:
-{
-  "riskScore": numeric 0-100,
-  "fraudProbability": numeric 0-1,
-  "missingDocuments": ["list", "of", "missing", "documents"],
-  "documentQuality": "Good/Average/Poor",
-  "confidenceScore": numeric 0-1,
-  "policyRecommendation": "Approve/Review/Reject",
-  "approvalProbability": numeric 0-1,
-  "aiSummary": "2-3 sentence professional summary of applicant and risk assessment",
-  "incomeVerified": boolean,
-  "employmentVerified": boolean,
-  "creditAssessment": "Positive/Negative/Insufficient data"
-}
-
-Loan application text:
-${pdfText}`;
-
-    info('Sending to LLM for extraction...');
-    const extractContent = await callLlm([
-      { role: 'system', content: 'You are a precise data extraction tool. Return ONLY valid JSON, no explanations, no markdown, no code fences.' },
-      { role: 'user', content: extractionPrompt },
-    ]);
-    info('Extraction done, starting risk analysis...');
-    const riskContent = await callLlm([
-      { role: 'system', content: 'You are a precise data extraction tool. Return ONLY valid JSON, no explanations, no markdown, no code fences.' },
-      { role: 'user', content: riskPrompt },
+    info('Sending to LLM...');
+    const content = await callLlm([
+      { role: 'system', content: 'You are a precise data extraction and risk analysis tool. Return ONLY valid JSON with nested "extracted" and "risk" objects. No markdown, no explanations.' },
+      { role: 'user', content: combinedPrompt },
     ]);
 
-    info('LLM responded successfully');
+    const jsonText = extractJsonFromText(content);
+    info('LLM response parsed');
 
-    const extractText = extractJsonFromText(extractContent);
-    const riskText = extractJsonFromText(riskContent);
-
-    info('Raw extraction response', extractText.substring(0, 200));
-    info('Raw risk response', riskText.substring(0, 200));
-
-    let extracted: ExtractedData;
-    let risk: RiskAnalysis;
-    try {
-      extracted = JSON.parse(extractText);
-      risk = JSON.parse(riskText);
-    } catch (parseErr: any) {
-      logError('Failed to parse LLM response as JSON', parseErr.message);
-      logError('Extract text', extractText);
-      logError('Risk text', riskText);
-      throw new Error('Invalid JSON response from LLM: ' + parseErr.message);
+    const combined = JSON.parse(jsonText);
+    if (!combined.extracted || !combined.risk) {
+      throw new Error('LLM response missing extracted or risk fields');
     }
+
+    const extracted: ExtractedData = {
+      ...combined.extracted,
+      confidence: combined.extracted.confidence || {},
+    };
+    const risk: RiskAnalysis = combined.risk;
 
     info('AI extraction and risk analysis completed');
     return { extracted, risk };
@@ -272,10 +232,4 @@ function getFallbackData(): { extracted: ExtractedData; risk: RiskAnalysis } {
       creditAssessment: 'Positive',
     },
   };
-}
-
-export async function extractTextFromPdf(filePath: string): Promise<string> {
-  const fileBuffer = fs.readFileSync(filePath);
-  const pdfData = await pdfParse(fileBuffer);
-  return pdfData.text;
 }

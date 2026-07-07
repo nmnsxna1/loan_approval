@@ -1,7 +1,7 @@
 ﻿const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijg5ZDNiZWE3LTc2YWQtNDUwYi1hNzdiLTg0NGYwOGY1NzMyMCIsInVzZXJuYW1lIjoiYXBwbGljYW50Iiwicm9sZSI6IkFQUExJQ0FOVCIsImlhdCI6MTc4MzQwMjg1NiwiZXhwIjoxNzgzNDg5MjU2fQ.XgbsbaT2Ye9-Cm8YuX5qGVGWO-9ye8WRe6aZmvk8pX0';
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijg5ZDNiZWE3LTc2YWQtNDUwYi1hNzdiLTg0NGYwOGY1NzMyMCIsInVzZXJuYW1lIjoiYXBwbGljYW50Iiwicm9sZSI6IkFQUExJQ0FOVCIsImlhdCI6MTc4MzQwMzA4OSwiZXhwIjoxNzgzNDg5NDg5fQ.J1NbPTQxWJ-Pn7lKy-szvwzsR-cBocyp-s2w_ChSF4g';
 const pdfPath = path.join(__dirname, 'sample-pdfs', 'sample-1-all-correct.pdf');
 const pdfData = fs.readFileSync(pdfPath);
 const boundary = '----FormBoundary' + Math.random().toString(36).substring(2);

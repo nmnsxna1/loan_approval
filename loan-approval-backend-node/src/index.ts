@@ -45,7 +45,7 @@ app.get('/api/debug/pdf-text', async (_req, res) => {
     const pdfParse = (await import('pdf-parse')).default;
     const pdfPath = pathMod.join(__dirname, '..', 'sample-pdfs', 'sample-1-all-correct.pdf');
     const buf = fs.readFileSync(pdfPath);
-    const hex50 = Array.from(buf.slice(0, 50)).map((b: number) => b.toString(16).padStart(2, '0')).join(' ');
+    const hex50 = [...buf.slice(0, 50)].map((b) => b.toString(16).padStart(2, '0')).join(' ');
     const data = await pdfParse(buf);
     res.json({ text: data.text, numpages: data.numpages, pdfPath, size: buf.length, hex: hex50 });
   } catch (err: any) {
@@ -55,7 +55,7 @@ app.get('/api/debug/pdf-text', async (_req, res) => {
     let info: any = {};
     try {
       const buf = fs.readFileSync(pdfPath);
-      info = { size: buf.length, hex: Array.from(buf.slice(0, 50)).map((b: number) => b.toString(16).padStart(2, '0')).join(' '), path: pdfPath, dirname: __dirname };
+      info = { size: buf.length, hex: [...buf.slice(0, 50)].map((b) => b.toString(16).padStart(2, '0')).join(' '), path: pdfPath, dirname: __dirname };
     } catch (e2: any) {
       info = { fileError: e2.message, path: pdfPath, dirname: __dirname };
     }
